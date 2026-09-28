@@ -20,7 +20,8 @@ import {
   type PlannedReminder,
   type ReminderDayState,
 } from '@gymolingo/core';
-import { useDB, insert } from '@/data/store';
+import { useDB, insert, setPrefs } from '@/data/store';
+import { autoReportWeek, ensureWeeklyReport } from './coach';
 import { useReminderSettings, useRows } from '@/data/hooks';
 import { syncNow } from '@/data/sync';
 import { initAuth } from './account';
@@ -72,7 +73,7 @@ function OnboardedEffects() {
   const t = useTodayState();
   const settings = useReminderSettings();
   const achievements = useRows('user_achievements');
-  const friends = useDB((s) => (s.prefs as { friendsCount?: number }).friendsCount ?? 0);
+  const friends = useDB((s) => s.prefs.friendsCount ?? 0);
   const badges = useBadgeStats(t.data, t.streaks, t.game.level.level, t.game.challengesCompleted, friends);
   const account = useDB((s) => s.accountUserId);
 
@@ -82,6 +83,14 @@ function OnboardedEffects() {
     const sub = AppState.addEventListener('change', (st) => st === 'active' && void syncHealthSteps());
     return () => sub.remove();
   }, []);
+
+  // automatic weekly report (once per day; computed on-device, AI only if explicitly enabled)
+  useEffect(() => {
+    const prefs = useDB.getState().prefs;
+    if (prefs.lastAutoReport === t.today) return;
+    const isSunday = new Date(`${t.today}T12:00:00`).getDay() === 0;
+    void ensureWeeklyReport(autoReportWeek(t.today), isSunday).then(() => setPrefs({ lastAutoReport: t.today }));
+  }, [t.today]);
 
   // reminders
   const reminderKey = JSON.stringify([t.reminderState, settings]);

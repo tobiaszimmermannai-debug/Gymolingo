@@ -12,7 +12,8 @@ import { ProgressBar } from '@/ui/ProgressBar';
 import { colors, radius, spacing } from '@/ui/theme';
 import { useTodayState } from '@/features/today';
 import { startWorkoutForDay } from '@/features/workoutStart';
-import { useExerciseLookup } from '@/data/hooks';
+import { useExerciseLookup, useRows } from '@/data/hooks';
+import { BADGE_MAP } from '@gymolingo/core';
 import { SyncBadge } from '@/features/SyncBadge';
 
 const STREAK_ICONS: Record<StreakKind, string> = { training: '🏋️', nutrition: '📒', protein: '🥩', steps: '👟', checkin: '🌙', weight: '⚖️' };
@@ -25,6 +26,7 @@ export default function Home() {
   const kcalPct = p.calorie_target ? t.nutrition.totals.kcal / p.calorie_target : 0;
   const streakKinds: StreakKind[] = ['training', 'nutrition', 'protein', 'steps', 'checkin', ...(p.weight_tracking_enabled ? (['weight'] as StreakKind[]) : [])];
   const bestNow = streakKinds.reduce((m, k) => Math.max(m, t.streaks[k].current), 0);
+  const unseen = useRows('user_achievements').filter((a) => !a.seen && BADGE_MAP[a.badge_id]);
   const hour = new Date().getHours();
   const greeting = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
 
@@ -79,6 +81,20 @@ export default function Home() {
           </Row>
         </LinearGradient>
       </Pressable>
+
+      {unseen.length > 0 && (
+        <Card variant="accent" onPress={() => router.push('/achievements')} testID="new-badges" accessibilityLabel="Neue Abzeichen ansehen">
+          <Row>
+            <Text variant="h1">{BADGE_MAP[unseen[0].badge_id].icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyMedium">Neues Abzeichen{unseen.length > 1 ? ` (+${unseen.length - 1} weitere)` : ''}: {BADGE_MAP[unseen[0].badge_id].title}</Text>
+              <Text variant="small" tone="secondary">
+                {BADGE_MAP[unseen[0].badge_id].description}
+              </Text>
+            </View>
+          </Row>
+        </Card>
+      )}
 
       {/* Nutrition today */}
       <Card onPress={() => router.push('/nutrition')} testID="home-nutrition-card" accessibilityLabel="Ernährung heute">

@@ -31,6 +31,8 @@ export interface DBState {
     notificationsAsked?: boolean;
     healthSource?: 'none' | 'apple_health' | 'health_connect';
     restTimerSound?: boolean;
+    lastAutoReport?: string;
+    friendsCount?: number;
   };
 }
 

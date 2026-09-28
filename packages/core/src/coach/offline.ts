@@ -12,6 +12,15 @@ export function answerOffline(ctx: CoachContext, question: string): string {
   const has = (...words: string[]) => words.some((w) => q.includes(w));
   const lines: string[] = [];
 
+  if (ctx.today_plan && has('heute', 'trainier', 'workout', 'plan') && !has('protein', 'kalorie', 'gewicht', 'schritt')) {
+    const tp = ctx.today_plan;
+    if (tp.done) return `Dein Training (${tp.name}) ist für heute erledigt ✅. Jetzt zählen Regeneration, Protein und Schlaf.`;
+    lines.push(tp.is_training_day ? `Heute steht **${tp.name}** an:` : `Heute ist laut Plan Ruhetag. Wenn du trotzdem trainieren möchtest, wäre **${tp.name}** als Nächstes dran:`);
+    for (const e of tp.exercises) lines.push(`• ${e.exercise}: ${e.target}`);
+    lines.push('Die Ziele basieren auf deinem letzten Training (Doppelprogression: erst Wiederholungen, dann Gewicht).');
+    return lines.join('\n');
+  }
+
   const lift = ctx.key_lifts.find((l) => q.includes(normalize(l.exercise).split(' ')[0]));
   if (lift) {
     lines.push(`**${lift.exercise}**`);

@@ -105,3 +105,14 @@ describe('aggregates, streak input and coach', () => {
     expect(addDays('2026-03-31', 1)).toBe('2026-04-01');
   });
 });
+
+describe('offline coach: today plan', () => {
+  it('answers what to train today from the plan', () => {
+    const ctx = buildCoachContext(emptyData(), '2026-03-08', undefined, null, { name: 'Push A', is_training_day: true, done: false, exercises: [{ exercise: 'Bankdrücken', target: '80 kg × 8/8/8' }] });
+    const a = answerOffline(ctx, 'Was trainiere ich heute?');
+    expect(a).toContain('Push A');
+    expect(a).toContain('80 kg × 8/8/8');
+    const done = buildCoachContext(emptyData(), '2026-03-08', undefined, null, { name: 'Push A', is_training_day: true, done: true, exercises: [] });
+    expect(answerOffline(done, 'Was soll ich heute trainieren?')).toContain('erledigt');
+  });
+});

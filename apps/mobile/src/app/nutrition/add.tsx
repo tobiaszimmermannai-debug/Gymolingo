@@ -11,6 +11,7 @@ import { Card } from '@/ui/Card';
 import { colors, radius, spacing } from '@/ui/theme';
 import { useRows } from '@/data/hooks';
 import { recentFoods, useFoodSearch } from '@/features/foods';
+import { aiAvailability } from '@/lib/ai';
 
 export default function AddFood() {
   const { date = todayISO(), meal = 'lunch' } = useLocalSearchParams<{ date?: string; meal?: MealType }>();
@@ -25,7 +26,7 @@ export default function AddFood() {
       <Input testID="food-search" placeholder="Lebensmittel suchen, z. B. Magerquark" value={q} onChangeText={setQ} autoFocus />
       <Row gap={spacing.sm}>
         <QuickAction icon="barcode-outline" label="Barcode" testID="action-scan" onPress={() => router.push(`/nutrition/scan?date=${date}&meal=${meal}`)} />
-        <QuickAction icon="camera-outline" label="Foto (KI)" testID="action-photo" onPress={() => router.push(`/nutrition/photo?date=${date}&meal=${meal}`)} />
+        {aiAvailability() !== 'disabled' && <QuickAction icon="camera-outline" label="Foto (KI)" testID="action-photo" onPress={() => router.push(`/nutrition/photo?date=${date}&meal=${meal}`)} />}
         <QuickAction icon="flash-outline" label="Schnell" testID="action-quick" onPress={() => router.push(`/nutrition/quick?date=${date}&meal=${meal}`)} />
         <QuickAction icon="create-outline" label="Eigenes" testID="action-custom" onPress={() => router.push(`/nutrition/custom-food?date=${date}&meal=${meal}&name=${encodeURIComponent(q)}`)} />
       </Row>

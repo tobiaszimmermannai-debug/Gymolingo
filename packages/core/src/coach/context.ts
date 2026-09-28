@@ -63,6 +63,8 @@ export interface CoachContext {
     next_suggestion: string;
     plateau: boolean;
   }[];
+  /** Today's planned workout with progression targets (optional, provided by the app). */
+  today_plan: { name: string; is_training_day: boolean; done: boolean; exercises: { exercise: string; target: string }[] } | null;
   data_gaps: string[];
 }
 
@@ -71,6 +73,7 @@ export function buildCoachContext(
   today: ISODate,
   lookup?: (id: string) => ExerciseDef | undefined,
   birthYear?: number | null,
+  todayPlan: CoachContext['today_plan'] = null,
 ): CoachContext {
   const p = data.profile;
   const from = addDays(today, -27);
@@ -155,6 +158,7 @@ export function buildCoachContext(
       entries_30d: ws.daysLogged30,
     },
     key_lifts,
+    today_plan: todayPlan,
     data_gaps: gaps,
   };
 }

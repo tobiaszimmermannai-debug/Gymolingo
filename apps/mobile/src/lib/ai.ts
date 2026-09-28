@@ -4,10 +4,12 @@
  */
 import { supabase } from './supabase';
 import { useDB } from '@/data/store';
+import { AI_ENABLED } from './config';
 
-export type AiAvailability = 'ok' | 'no_backend' | 'no_account';
+export type AiAvailability = 'ok' | 'disabled' | 'no_backend' | 'no_account';
 
 export function aiAvailability(): AiAvailability {
+  if (!AI_ENABLED) return 'disabled';
   if (!supabase) return 'no_backend';
   if (!useDB.getState().accountUserId) return 'no_account';
   return 'ok';

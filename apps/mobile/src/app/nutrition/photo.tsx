@@ -93,9 +93,11 @@ export default function PhotoMeal() {
     return (
       <Screen title="Foto-Erkennung" back>
         <Card>
-          <Text variant="h3">KI-Fotoerkennung benötigt ein Konto</Text>
+          <Text variant="h3">{availability === 'disabled' ? 'KI-Fotoerkennung ist deaktiviert' : 'KI-Fotoerkennung benötigt ein Konto'}</Text>
           <Text tone="secondary" style={{ marginTop: 6 }}>
-            {availability === 'no_backend'
+            {availability === 'disabled'
+              ? 'Diese Installation läuft im kostenlosen Modus ohne KI-Dienst. Nutze Suche, Barcode oder Schnelleintrag.'
+              : availability === 'no_backend'
               ? 'Diese Installation ist ohne Server konfiguriert. Die Fotoanalyse läuft serverseitig (der API-Schlüssel liegt nie in der App).'
               : 'Melde dich an bzw. erstelle ein Konto, um Mahlzeiten per Foto schätzen zu lassen.'}
           </Text>
