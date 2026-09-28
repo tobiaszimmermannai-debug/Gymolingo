@@ -18,3 +18,4 @@ export * from './coach/report';
 export * from './coach/context';
 export * from './coach/offline';
 export * from './sync/engine';
+export * from './training/templates';

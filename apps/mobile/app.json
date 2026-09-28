@@ -1,41 +1,61 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
-    "version": "1.0.0",
+    "name": "Gymolingo",
+    "slug": "gymolingo",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "scheme": "gymolingo",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0C0E",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.gymolingo.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Gymolingo nutzt die Kamera zum Scannen von Barcodes und für Fortschrittsbilder.",
+        "NSPhotoLibraryUsageDescription": "Gymolingo benötigt Zugriff auf deine Fotos, um Fortschrittsbilder und Mahlzeitenfotos auszuwählen.",
+        "NSHealthShareUsageDescription": "Gymolingo liest deine Schritte und dein Körpergewicht aus Apple Health.",
+        "NSHealthUpdateUsageDescription": "Gymolingo kann Trainings und Gewicht in Apple Health speichern."
+      }
     },
     "android": {
+      "package": "com.gymolingo.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B0C0E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": ["android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", "android.permission.SCHEDULE_EXACT_ALARM"],
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "Gymolingo",
+      "shortName": "Gymolingo",
+      "themeColor": "#0B0C0E",
+      "backgroundColor": "#0B0C0E"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0B0C0E",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      ["expo-notifications", { "color": "#C6F432" }],
+      ["expo-camera", { "cameraPermission": "Gymolingo nutzt die Kamera zum Scannen von Barcodes.", "barcodeScannerEnabled": true }],
+      ["expo-image-picker", { "photosPermission": "Gymolingo benötigt Zugriff auf deine Fotos für Fortschritts- und Mahlzeitenfotos.", "cameraPermission": "Gymolingo nutzt die Kamera für Fortschritts- und Mahlzeitenfotos." }],
+      "expo-sharing",
+      "expo-sqlite"
     ],
     "experiments": {
-      "typedRoutes": true,
+      "typedRoutes": false,
       "reactCompiler": true
     }
   }

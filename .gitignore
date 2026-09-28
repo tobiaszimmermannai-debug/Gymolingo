@@ -16,3 +16,4 @@ playwright-report/
 *.tsbuildinfo
 ios/
 android/
+apps/mobile/.env
