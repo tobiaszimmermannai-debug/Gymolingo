@@ -9,14 +9,12 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0C0E",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.gymolingo.app",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "Gymolingo nutzt die Kamera zum Scannen von Barcodes und für Fortschrittsbilder.",
         "NSPhotoLibraryUsageDescription": "Gymolingo benötigt Zugriff auf deine Fotos, um Fortschrittsbilder und Mahlzeitenfotos auszuwählen.",
-        "NSHealthShareUsageDescription": "Gymolingo liest deine Schritte und dein Körpergewicht aus Apple Health.",
-        "NSHealthUpdateUsageDescription": "Gymolingo kann Trainings und Gewicht in Apple Health speichern."
+        "NSHealthShareUsageDescription": "Gymolingo liest deine Schritte und dein Körpergewicht aus Apple Health."
       }
     },
     "android": {
@@ -27,7 +25,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "permissions": ["android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", "android.permission.SCHEDULE_EXACT_ALARM"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -45,12 +47,29 @@
         {
           "backgroundColor": "#0B0C0E",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
-      ["expo-notifications", { "color": "#C6F432" }],
-      ["expo-camera", { "cameraPermission": "Gymolingo nutzt die Kamera zum Scannen von Barcodes.", "barcodeScannerEnabled": true }],
-      ["expo-image-picker", { "photosPermission": "Gymolingo benötigt Zugriff auf deine Fotos für Fortschritts- und Mahlzeitenfotos.", "cameraPermission": "Gymolingo nutzt die Kamera für Fortschritts- und Mahlzeitenfotos." }],
+      [
+        "expo-notifications",
+        {
+          "color": "#C6F432"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Gymolingo nutzt die Kamera zum Scannen von Barcodes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Gymolingo benötigt Zugriff auf deine Fotos für Fortschritts- und Mahlzeitenfotos.",
+          "cameraPermission": "Gymolingo nutzt die Kamera für Fortschritts- und Mahlzeitenfotos."
+        }
+      ],
       "expo-sharing",
       "expo-sqlite"
     ],

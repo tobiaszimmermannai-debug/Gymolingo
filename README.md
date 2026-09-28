@@ -60,7 +60,7 @@ Für die Produktion: kostenloses Supabase-Projekt anlegen (Free-Plan), `npx supa
 ```bash
 npm test                    # 101 Unit-Tests der Domänenlogik (Vitest)
 npm run test:db             # pgTAP: RLS, Last-Write-Wins, Community & Privatsphäre (lokales Supabase nötig)
-npm run build:web:test && npx playwright test --project=local        # E2E ohne Backend
+npm run build:web:test && npx playwright test --project=local        # E2E ohne Backend (inkl. PWA-Offline)
 npm run build:web:backend && npx playwright test --project=backend   # E2E mit lokalem Supabase
 npm run typecheck
 ```

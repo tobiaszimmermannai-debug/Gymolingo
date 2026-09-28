@@ -26,6 +26,8 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Premium Dark Mode, Anthrazit/Schwarz, Lime-Akzent, Inter-Typografie
 - ✅ Karten, Fortschrittsringe, Balken, interaktive SVG-Diagramme (Tooltip per Tippen/Ziehen)
 - ✅ Mobile-first, max. Inhaltsbreite für Tablet/Web
+- ✅ App-Icon, adaptives Android-Icon, Splash, Favicon, PWA-Icons (`node scripts/gen-icons.mjs` aus `assets-src/mark.svg`)
+- ✅ PWA: Manifest, Service Worker (Offline-Start), deutsches `index.html` (`apps/mobile/public`)
 - ✅ Tab-Navigation: Home, Training, Nutrition, Progress, Community
 - 🟩 Animationen: dezente Press-States/Haptik; keine aufwendigen Übergangsanimationen
 
@@ -97,7 +99,7 @@ Letzte Aktualisierung: 2026-09-28
 ### 12. Tests
 - ✅ core: 101 Unit-Tests (Vitest)
 - ✅ DB: 30 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre)
-- ✅ E2E lokal (10): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach
+- ✅ E2E lokal (11): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
 - ✅ E2E Backend (4): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -122,11 +124,9 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 10/10, E2E Backend 4/4, Typecheck grün.
+- Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 11/11, E2E Backend 4/4, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. App-Icon & Splash im Gymolingo-Branding (aktuell Expo-Standard) – `assets/images`, `app.json`.
-2. PWA: Web-Manifest + Service Worker für Offline-Start der Web-Version (kostenloses Hosting).
-3. E2E für Fortschrittsbilder-Upload gegen lokales Supabase-Storage.
-4. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
-5. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.
+1. E2E für Fortschrittsbilder-Upload gegen lokales Supabase-Storage.
+2. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
+3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

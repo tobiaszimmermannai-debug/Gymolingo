@@ -31,11 +31,13 @@ import { syncHealthSteps } from '@/lib/health';
 import '@/lib/health/enable';
 import { supabase } from '@/lib/supabase';
 import { uploadPendingPhotos } from './photoSync';
+import { registerServiceWorker } from '@/lib/pwa';
 
 export function AppBootstrap() {
   const onboarded = useDB((s) => !!s.tables.athlete_profiles[s.userId]?.onboarding_completed);
   useEffect(() => {
     configureNotifications();
+    registerServiceWorker();
     void initAuth();
   }, []);
   useAutoSync();

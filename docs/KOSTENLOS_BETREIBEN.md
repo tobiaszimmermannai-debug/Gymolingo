@@ -25,7 +25,7 @@ Ziel: Entwicklung **und** Betrieb ohne laufende Kosten. Alles, was Geld kostet, 
 ```bash
 npm run build:web     # → apps/mobile/dist
 ```
-Den Ordner `dist` z. B. auf **GitHub Pages**, **Cloudflare Pages** oder **Netlify** (jeweils Gratis-Stufe) hochladen. Wichtig: SPA-Fallback auf `index.html` einrichten (Cloudflare/Netlify: `_redirects` mit `/* /index.html 200`; GitHub Pages: `404.html` = Kopie von `index.html`).
+Die Web-Version ist eine **PWA**: installierbar („Zum Home-Bildschirm“) und startet nach dem ersten Besuch auch offline (Service Worker `public/sw.js`). Den Ordner `dist` z. B. auf **GitHub Pages**, **Cloudflare Pages** oder **Netlify** (jeweils Gratis-Stufe) hochladen. Wichtig: SPA-Fallback auf `index.html` einrichten (Cloudflare/Netlify: `_redirects` mit `/* /index.html 200`; GitHub Pages: `404.html` = Kopie von `index.html`).
 
 ### Auf dem eigenen Handy nutzen
 - **Expo Go** (kostenlos): `cd apps/mobile && npx expo start` → QR-Code scannen.
