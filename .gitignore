@@ -17,3 +17,4 @@ playwright-report/
 ios/
 android/
 apps/mobile/.env
+apps/mobile/dist-backend/
