@@ -2,7 +2,7 @@
   "name": "gymolingo",
   "private": true,
   "version": "0.1.0",
-  "description": "Gymolingo \u2013 Gym, Nutrition & AI Progress App (Expo + Supabase monorepo)",
+  "description": "Gymolingo – Gym, Nutrition & AI Progress App (Expo + Supabase monorepo)",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -21,7 +21,8 @@
     "test:e2e": "playwright test",
     "build:edge-core": "npm run build:edge -w @gymolingo/core",
     "db:seed-demo": "node scripts/seed-demo.mjs",
-    "build:web:test": "cd apps/mobile && EXPO_PUBLIC_DEV_TOOLS=true expo export --platform web --output-dir dist --clear"
+    "build:web:test": "cd apps/mobile && EXPO_PUBLIC_DEV_TOOLS=true expo export --platform web --output-dir dist --clear",
+    "test:edge": "node scripts/test-edge.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -10,6 +10,7 @@ export * from './training/progression';
 export * from './training/exercises';
 export * from './training/stats';
 export * from './body/trend';
+export * from './body/bodyFat';
 export * from './streaks/streaks';
 export * from './gamification/xp';
 export * from './reminders/engine';

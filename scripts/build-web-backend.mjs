@@ -5,5 +5,6 @@ const status = JSON.parse(execSync('npx supabase status -o json', { encoding: 'u
 execSync('npx expo export --platform web --output-dir dist-backend --clear', {
   cwd: 'apps/mobile',
   stdio: 'inherit',
-  env: { ...process.env, EXPO_PUBLIC_SUPABASE_URL: status.API_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY: status.ANON_KEY },
+  // AI UI enabled: the E2E tests mock the edge functions (no Gemini key, no costs)
+  env: { ...process.env, EXPO_PUBLIC_SUPABASE_URL: status.API_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY: status.ANON_KEY, EXPO_PUBLIC_AI_ENABLED: 'true' },
 });

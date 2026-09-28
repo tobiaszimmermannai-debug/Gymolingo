@@ -33,6 +33,8 @@ export interface DBState {
     restTimerSound?: boolean;
     lastAutoReport?: string;
     friendsCount?: number;
+    /** user agreed that progress photos may be sent to the AI (Gemini) for body fat estimates */
+    aiPhotoConsent?: boolean;
   };
 }
 

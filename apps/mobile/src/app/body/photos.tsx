@@ -15,6 +15,7 @@ import { requestSync } from '@/data/sync';
 import { persistPhoto, deletePhotoFile } from '@/lib/photos';
 import { deleteRemotePhoto, signedPhotoUrl, uploadPendingPhotos } from '@/features/photoSync';
 import { confirm } from '@/lib/dialog';
+import { BodyFatCard } from '@/features/BodyFatCard';
 
 const POSES: { value: PhotoPose; label: string }[] = [
   { value: 'front', label: 'Vorne' },
@@ -66,6 +67,7 @@ export default function Photos() {
         <Button title="Aus Galerie" icon="images-outline" variant="secondary" style={{ flex: 1 }} onPress={() => add(false)} testID="photo-gallery" />
       </Row>
       {error && <Text tone="danger">{error}</Text>}
+      <BodyFatCard withPhotos />
       <Segmented options={[{ value: 'grid', label: 'Übersicht' }, { value: 'compare', label: 'Vergleich' }]} value={mode} onChange={(v) => setMode(v as 'grid' | 'compare')} />
       {ofPose.length === 0 && <Text tone="muted">Noch keine Fotos für diese Ansicht. Tipp: gleiches Licht, gleiche Pose, alle 2–4 Wochen.</Text>}
       {mode === 'compare' && ofPose.length >= 2 ? (

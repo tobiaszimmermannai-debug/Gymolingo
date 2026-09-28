@@ -12,6 +12,7 @@ import { colors, spacing } from '@/ui/theme';
 import { useRows } from '@/data/hooks';
 import { insert, update } from '@/data/store';
 import { requestSync } from '@/data/sync';
+import { BodyFatCard } from '@/features/BodyFatCard';
 
 const FIELDS: { key: keyof Pick<BodyMeasurement, 'waist_cm' | 'chest_cm' | 'hips_cm' | 'arm_cm' | 'thigh_cm' | 'neck_cm'>; label: string }[] = [
   { key: 'waist_cm', label: 'Taille' },
@@ -63,6 +64,7 @@ export default function Measurements() {
         {err && <Text tone="danger">{err}</Text>}
         <Button title="Speichern" onPress={save} testID="save-measurements" />
       </Card>
+      <BodyFatCard />
       {sorted.length > 0 && (
         <Section title="Verlauf">
           <Row gap={spacing.sm} wrap>

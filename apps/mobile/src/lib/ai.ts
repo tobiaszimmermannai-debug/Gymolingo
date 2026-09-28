@@ -1,6 +1,6 @@
 /**
  * Client for the server-side AI functions (Supabase Edge Functions).
- * API keys never reach the app – the functions hold ANTHROPIC_API_KEY.
+ * API keys never reach the app – the functions hold GEMINI_API_KEY (Google Gemini).
  */
 import { supabase } from './supabase';
 import { useDB } from '@/data/store';
@@ -72,4 +72,20 @@ export interface PhotoEstimateItem {
 
 export function analyzeMealPhoto(imageBase64: string, mediaType: string, hint?: string) {
   return invoke<{ items: PhotoEstimateItem[]; note: string; model: string }>('meal-photo', { image: imageBase64, mediaType, hint });
+}
+
+export interface BodyFatEstimate {
+  usable: boolean;
+  body_fat_pct?: number;
+  range_low?: number;
+  range_high?: number;
+  confidence?: 'low' | 'medium' | 'high';
+  cues: string;
+  photo_tips?: string;
+  model?: string;
+}
+
+/** Visual body fat estimate from 1–3 progress photos (downscaled JPEGs, base64). */
+export function estimateBodyFat(images: { data: string; mediaType: string; pose: string }[]) {
+  return invoke<BodyFatEstimate>('body-fat', { images });
 }

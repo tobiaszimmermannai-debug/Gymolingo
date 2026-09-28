@@ -419,3 +419,6 @@ verify_jwt = true
 
 [functions.meal-photo]
 verify_jwt = true
+
+[functions.body-fat]
+verify_jwt = true

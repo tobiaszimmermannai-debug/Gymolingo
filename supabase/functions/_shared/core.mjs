@@ -1369,6 +1369,33 @@ function bmi(weightKg, heightCm) {
   return Math.round(weightKg / Math.pow(heightCm / 100, 2) * 10) / 10;
 }
 
+// src/body/bodyFat.ts
+function navyBodyFat(i) {
+  const { sex, height_cm: h, waist_cm: w, neck_cm: n } = i;
+  if (!h || !w || !n || h < 120 || h > 230) return null;
+  let pct;
+  if (sex === "male") {
+    if (w - n <= 0) return null;
+    pct = 495 / (1.0324 - 0.19077 * Math.log10(w - n) + 0.15456 * Math.log10(h)) - 450;
+  } else if (sex === "female") {
+    const hip = i.hips_cm;
+    if (!hip || w + hip - n <= 0) return null;
+    pct = 495 / (1.29579 - 0.35004 * Math.log10(w + hip - n) + 0.221 * Math.log10(h)) - 450;
+  } else return null;
+  if (!Number.isFinite(pct)) return null;
+  return Math.round(Math.min(60, Math.max(2, pct)) * 10) / 10;
+}
+function navyRequiredFields(sex) {
+  return sex === "female" ? ["waist_cm", "neck_cm", "hips_cm"] : ["waist_cm", "neck_cm"];
+}
+function latestNavyBodyFat(measurements, sex, heightCm) {
+  const need = navyRequiredFields(sex);
+  const m = [...measurements].filter((x) => !x.deleted && need.every((f) => x[f] != null)).sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (!m) return null;
+  const pct = navyBodyFat({ sex, height_cm: heightCm, waist_cm: m.waist_cm, neck_cm: m.neck_cm, hips_cm: m.hips_cm });
+  return pct === null ? null : { date: m.date, pct };
+}
+
 // src/streaks/streaks.ts
 var STREAK_LABELS_DE = {
   training: "Trainingstreue",
@@ -3030,6 +3057,7 @@ export {
   isoWeekNumber,
   kcalFromMacros,
   lastPerformedSets,
+  latestNavyBodyFat,
   levelFromXp,
   linearSlope,
   mealsByDate,
@@ -3038,6 +3066,8 @@ export {
   minutesToTime,
   mostTrainedExercises,
   movingAverage,
+  navyBodyFat,
+  navyRequiredFields,
   nextMilestone,
   normalize,
   nutrientsForAmount,

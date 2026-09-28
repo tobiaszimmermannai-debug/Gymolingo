@@ -11,6 +11,7 @@ import { Input, parseDecimal } from '@/ui/Input';
 import { Badge, ChipGroup } from '@/ui/Chip';
 import { colors, radius, spacing } from '@/ui/theme';
 import { aiAvailability, analyzeMealPhoto, AiError, type PhotoEstimateItem } from '@/lib/ai';
+import { prepareForAi } from '@/lib/imageResize';
 import { insertMany, nowISO } from '@/data/store';
 import { requestSync } from '@/data/sync';
 
@@ -22,7 +23,7 @@ const CONF_LABEL = { low: 'unsicher', medium: 'mittel', high: 'recht sicher' } a
  */
 export default function PhotoMeal() {
   const { date = todayISO(), meal = 'lunch' } = useLocalSearchParams<{ date?: string; meal?: MealType }>();
-  const [image, setImage] = useState<{ uri: string; base64: string; type: string } | null>(null);
+  const [image, setImage] = useState<{ uri: string } | null>(null);
   const [hint, setHint] = useState('');
   const [items, setItems] = useState<PhotoEstimateItem[] | null>(null);
   const [note, setNote] = useState('');
@@ -33,15 +34,14 @@ export default function PhotoMeal() {
 
   const pick = async (camera: boolean) => {
     setError(null);
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.6, base64: true, allowsEditing: false };
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, allowsEditing: false };
     if (camera) {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) return setError('Kamera-Zugriff wurde nicht erlaubt.');
     }
     const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-    if (res.canceled || !res.assets[0]?.base64) return;
-    const a = res.assets[0];
-    setImage({ uri: a.uri, base64: a.base64!, type: a.mimeType ?? 'image/jpeg' });
+    if (res.canceled || !res.assets[0]) return;
+    setImage({ uri: res.assets[0].uri });
     setItems(null);
   };
 
@@ -50,7 +50,8 @@ export default function PhotoMeal() {
     setLoading(true);
     setError(null);
     try {
-      const r = await analyzeMealPhoto(image.base64, image.type, hint.trim() || undefined);
+      const small = await prepareForAi(image.uri); // ~1024 px JPEG keeps the upload small
+      const r = await analyzeMealPhoto(small.data, small.mediaType, hint.trim() || undefined);
       setItems(r.items);
       setNote(r.note);
     } catch (e) {

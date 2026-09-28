@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { addDays, dailyBodyFat, dailyWeights, formatDateDE, formatNumberDE, formatSigned, movingAverage, todayISO, weightSummary } from '@gymolingo/core';
 import { Screen, Row, Section } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
@@ -16,6 +16,7 @@ import { remove } from '@/data/store';
 import { requestSync } from '@/data/sync';
 import { confirm } from '@/lib/dialog';
 import { haptic } from '@/lib/haptics';
+import { BODY_FAT_NOTE, type BodyFatSource } from '@/features/bodyFat';
 
 export default function Weight() {
   const weights = useRows('weight_entries');
@@ -23,7 +24,9 @@ export default function Weight() {
   const today = todayISO();
   const todays = weights.find((w) => w.date === today);
   const [value, setValue] = useState(todays ? String(todays.weight_kg).replace('.', ',') : '');
-  const [bf, setBf] = useState(todays?.body_fat_pct ? String(todays.body_fat_pct).replace('.', ',') : '');
+  // prefilled from a body fat estimate (BodyFatCard → /body/weight?bf=16.1&src=navy)
+  const params = useLocalSearchParams<{ bf?: string; src?: BodyFatSource }>();
+  const [bf, setBf] = useState(params.bf ? params.bf.replace('.', ',') : todays?.body_fat_pct ? String(todays.body_fat_pct).replace('.', ',') : '');
   const [range, setRange] = useState<'30' | '90' | '365'>('30');
   const [err, setErr] = useState<string | null>(null);
   const sum = useMemo(() => weightSummary(weights, today), [weights, today]);
@@ -39,7 +42,8 @@ export default function Weight() {
     if (w === null || w < 20 || w > 400) return setErr('Bitte ein Gewicht zwischen 20 und 400 kg eingeben.');
     if (b !== null && (b < 2 || b > 70)) return setErr('Körperfett zwischen 2 und 70 %.');
     setErr(null);
-    logWeight(today, Math.round(w * 100) / 100, b);
+    const estimated = params.src && params.bf && b !== null && Math.abs(b - Number(params.bf)) < 0.05;
+    logWeight(today, Math.round(w * 100) / 100, b, estimated ? BODY_FAT_NOTE[params.src!] : (todays?.note ?? null));
     haptic('success');
   };
 
@@ -107,7 +111,8 @@ export default function Weight() {
             <Text style={{ flex: 1 }}>{formatDateDE(w.date, true)}</Text>
             <Text variant="bodyMedium">{formatNumberDE(w.weight_kg, 1)} kg</Text>
             {w.body_fat_pct !== null && (
-              <Text variant="small" tone="secondary">
+              <Text variant="small" tone="secondary" accessibilityLabel={w.note?.startsWith('KFA:') ? `${w.note}: ${formatNumberDE(w.body_fat_pct, 1)} Prozent` : undefined}>
+                {w.note?.startsWith('KFA:') ? '~' : ''}
                 {formatNumberDE(w.body_fat_pct, 1)} %
               </Text>
             )}

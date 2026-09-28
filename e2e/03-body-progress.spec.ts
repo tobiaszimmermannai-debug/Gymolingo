@@ -86,3 +86,21 @@ test('delete all local data (guest)', async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId('onboarding-start')).toBeVisible();
 });
+
+test('body fat from tape measurements (Navy formula) is marked as estimate', async ({ page }) => {
+  await completeOnboarding(page); // male, 180 cm, 85 kg logged today
+  await page.goto('/body/measurements');
+  await expect(page.getByTestId('bodyfat-card')).toContainText('Miss Taille, Hals');
+  await page.getByTestId('m-neck_cm').fill('38');
+  await page.getByTestId('m-waist_cm').fill('85');
+  await page.getByTestId('save-measurements').click();
+  await expect(page.getByTestId('bf-navy-value')).toContainText('16,1 %');
+  // no AI section in the zero-cost build
+  await page.goto('/body/photos');
+  await expect(page.getByTestId('bf-navy-value')).toContainText('16,1 %');
+  await expect(page.getByTestId('bf-ai')).toHaveCount(0);
+  page.once('dialog', (d) => d.accept());
+  await page.getByTestId('bf-apply-navy').click();
+  await page.goto('/body/weight');
+  await expect(page.getByText('~16,1 %')).toBeVisible();
+});

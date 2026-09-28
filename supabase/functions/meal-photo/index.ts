@@ -1,9 +1,10 @@
 /**
- * Estimates foods and nutrients from a meal photo (Claude vision).
+ * Estimates foods and nutrients from a meal photo (Gemini vision).
  * The result is explicitly an estimate – the app stores it with is_estimate = true
  * and lets the user correct amounts. The photo is not stored.
  */
-import { anthropicClient, complete, describeError } from '../_shared/anthropic.ts';
+import { describeError, generate, geminiKey } from '../_shared/gemini.ts';
+import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { userClient } from '../_shared/userData.ts';
 
@@ -47,11 +48,12 @@ Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-  const { data: auth } = await userClient(req).auth.getUser();
+  const sb = userClient(req);
+  const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return json({ error: 'Nicht angemeldet' }, 401);
 
-  const client = anthropicClient();
-  if (!client) return json({ error: 'Die KI-Fotoerkennung ist auf dem Server nicht konfiguriert (ANTHROPIC_API_KEY fehlt).', code: 'not_configured' }, 501);
+  const key = geminiKey();
+  if (!key) return json({ error: 'Die KI-Fotoerkennung ist auf dem Server nicht konfiguriert (GEMINI_API_KEY fehlt).', code: 'not_configured' }, 501);
 
   let body: { image?: string; mediaType?: string; hint?: string };
   try {
@@ -64,22 +66,24 @@ Deno.serve(async (req) => {
   if (!image || image.length > MAX_BASE64) return json({ error: 'Bild fehlt oder ist zu groß (max. ca. 4,5 MB).' }, 413);
   if (!ALLOWED.includes(mediaType)) return json({ error: 'Nicht unterstütztes Bildformat.' }, 415);
 
+  if (!(await consumeAiQuota(sb).catch(() => false))) return json({ error: 'Tageslimit für KI-Anfragen erreicht – bitte morgen wieder oder manuell eintragen.' }, 429);
+
   try {
-    const r = await complete(client, {
+    const r = await generate(key, {
       system: SYSTEM,
-      effort: 'medium',
       jsonSchema: SCHEMA,
-      messages: [
+      temperature: 0.2,
+      contents: [
         {
           role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: image } },
-            { type: 'text', text: body.hint ? `Hinweis des Nutzers: ${String(body.hint).slice(0, 300)}` : 'Bitte analysiere diese Mahlzeit.' },
+          parts: [
+            { inlineData: { mimeType: mediaType, data: image } },
+            { text: body.hint ? `Hinweis des Nutzers: ${String(body.hint).slice(0, 300)}` : 'Bitte analysiere diese Mahlzeit.' },
           ],
         },
       ],
     });
-    if (r.refused || !r.text) return json({ error: 'Die Analyse wurde abgelehnt. Bitte trage die Mahlzeit manuell ein.' }, 422);
+    if (r.blocked || !r.text) return json({ error: 'Die Analyse wurde abgelehnt. Bitte trage die Mahlzeit manuell ein.' }, 422);
     const parsed = JSON.parse(r.text) as { items: Record<string, unknown>[]; note: string };
     const items = parsed.items
       .map((i) => ({

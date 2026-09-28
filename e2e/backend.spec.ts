@@ -222,3 +222,58 @@ test('progress photo is uploaded to the private bucket and visible on a second d
   await expect(b.getByTestId('onboarding-start')).toBeVisible();
   expect((await b.request.get(signed)).ok()).toBe(false);
 });
+
+/** width/height from a JPEG's SOF marker */
+function jpegSize(buf: Buffer): { width: number; height: number } {
+  let i = 2;
+  while (i < buf.length) {
+    const marker = buf.readUInt16BE(i);
+    const len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xffc0 && marker <= 0xffc3) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    i += 2 + len;
+  }
+  throw new Error('no SOF marker');
+}
+
+test('AI body fat estimate from photos: consent, downscaled upload, result, save as estimate', async ({ page }) => {
+  await register(page, 'Kai', `kfa-${run}@example.com`);
+  let payload: { images: { data: string; mediaType: string; pose: string }[] } | null = null;
+  await page.route('**/functions/v1/body-fat', async (route) => {
+    payload = route.request().postDataJSON();
+    await route.fulfill({ json: { usable: true, body_fat_pct: 17.2, range_low: 15, range_high: 19.5, confidence: 'medium', cues: 'Leichte Bauchdefinition sichtbar.', photo_tips: 'Gleiches Licht und Abstand.' } });
+  });
+  const big = await page.screenshot({ type: 'jpeg', quality: 80, scale: 'device' }); // ~1170 × 1992 px (device pixels)
+  expect(jpegSize(big).height).toBeGreaterThan(1500);
+
+  await page.goto('/body/photos');
+  await expect(page.getByTestId('bf-ai')).toHaveCount(0); // no photo yet
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByTestId('photo-gallery').click();
+  await (await chooser).setFiles({ name: 'front.jpg', mimeType: 'image/jpeg', buffer: big });
+  await expect(page.getByTestId('photo-image')).toHaveCount(1);
+
+  // consent is asked once; declining sends nothing
+  page.once('dialog', (d) => d.dismiss());
+  await page.getByTestId('bf-ai').click();
+  await expect(page.getByTestId('bf-ai-result')).toHaveCount(0);
+  expect(payload).toBeNull();
+
+  page.once('dialog', (d) => d.accept());
+  await page.getByTestId('bf-ai').click();
+  await expect(page.getByTestId('bf-ai-result')).toContainText('17,2 %');
+  await expect(page.getByTestId('bf-ai-result')).toContainText('15–20 % · Sicherheit mittel');
+  expect(payload!.images).toHaveLength(1);
+  expect(payload!.images[0].pose).toBe('front');
+  const sent = jpegSize(Buffer.from(payload!.images[0].data, 'base64'));
+  expect(Math.max(sent.width, sent.height)).toBe(1024);
+
+  page.once('dialog', (d) => d.accept()); // "Gespeichert"
+  await page.getByTestId('bf-apply-ai').click();
+  await page.goto('/body/weight');
+  await expect(page.getByText('~17,2 %')).toBeVisible();
+
+  // consent can be revoked
+  await page.goto('/body/photos');
+  await page.getByTestId('bf-revoke').click();
+  await expect(page.getByTestId('bf-revoke')).toHaveCount(0);
+});

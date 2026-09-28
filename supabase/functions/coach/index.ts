@@ -3,7 +3,8 @@
  *  - action "chat": answers a question using a factual snapshot of the user's data
  *  - action "weekly_report": interprets the deterministic weekly statistics
  * All numbers are computed by @gymolingo/core (bundled in _shared/core.mjs).
- * Without ANTHROPIC_API_KEY the same data is answered by the rule-based coach.
+ * Without GEMINI_API_KEY (or when the daily AI limit is reached) the same data
+ * is answered by the rule-based coach.
  */
 import {
   answerOffline,
@@ -15,7 +16,8 @@ import {
   startOfWeek,
   WEEKLY_REPORT_PROMPT,
 } from '../_shared/core.mjs';
-import { anthropicClient, complete, describeError, MODEL } from '../_shared/anthropic.ts';
+import { describeError, generate, geminiKey, MODEL } from '../_shared/gemini.ts';
+import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { loadUserData, userClient } from '../_shared/userData.ts';
 
@@ -66,25 +68,26 @@ Deno.serve(async (req) => {
   const custom = new Map((customRows ?? []).map((c: Record<string, unknown>) => [c.id as string, { ...c, increment_kg: Number(c.increment_kg) }]));
   const lookup = (id: string) => custom.get(id) as never;
 
-  const client = anthropicClient();
+  const key = geminiKey();
+  const aiAllowed = async () => !!key && (await consumeAiQuota(sb).catch(() => false));
 
   if (body.action === 'chat') {
     const message = String(body.message ?? '').trim().slice(0, 2000);
     if (!message) return json({ error: 'Leere Nachricht' }, 400);
     const ctx = buildCoachContext(data, today, lookup);
-    if (!client) return json({ reply: answerOffline(ctx, message), source: 'rules' });
+    if (!(await aiAllowed())) return json({ reply: answerOffline(ctx, message), source: 'rules' });
     const history = (body.history ?? [])
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
       .slice(-10)
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 4000) }));
+      .map((m) => ({ role: m.role === 'user' ? ('user' as const) : ('model' as const), parts: [{ text: m.content.slice(0, 4000) }] }));
     while (history.length && history[0].role !== 'user') history.shift();
     try {
-      const r = await complete(client, {
+      const r = await generate(key!, {
         system: COACH_SYSTEM_PROMPT,
-        messages: [...history, { role: 'user', content: buildCoachUserMessage(ctx, message) }],
-        effort: 'low',
+        contents: [...history, { role: 'user', parts: [{ text: buildCoachUserMessage(ctx, message) }] }],
+        temperature: 0.5,
       });
-      if (r.refused || !r.text) return json({ reply: answerOffline(ctx, message), source: 'rules' });
+      if (r.blocked || !r.text) return json({ reply: answerOffline(ctx, message), source: 'rules' });
       return json({ reply: r.text, source: 'ai', model: r.model });
     } catch (e) {
       const err = describeError(e);
@@ -97,15 +100,16 @@ Deno.serve(async (req) => {
     const weekStart = startOfWeek(isDate(body.weekStart) ? body.weekStart : today);
     const stats = buildWeeklyReport(data, weekStart, { lookup });
     const rules = renderWeeklyReportText(stats);
-    if (!client) return json({ sections: rules.sections, title: rules.title, stats, source: 'rules' });
+    if (!(await aiAllowed())) return json({ sections: rules.sections, title: rules.title, stats, source: 'rules' });
     try {
-      const r = await complete(client, {
+      const r = await generate(key!, {
         system: `${COACH_SYSTEM_PROMPT}\n\n${WEEKLY_REPORT_PROMPT}`,
-        messages: [{ role: 'user', content: `<wochenstatistik>\n${JSON.stringify(stats)}\n</wochenstatistik>\n\nNutzer: ${data.profile.display_name || 'Athlet'}, Ziel: ${data.profile.goal}.` }],
-        effort: 'medium',
+        contents: [{ role: 'user', parts: [{ text: `<wochenstatistik>\n${JSON.stringify(stats)}\n</wochenstatistik>\n\nNutzer: ${data.profile.display_name || 'Athlet'}, Ziel: ${data.profile.goal}.` }] }],
         jsonSchema: REPORT_SCHEMA,
+        temperature: 0.4,
+        maxOutputTokens: 8192,
       });
-      if (r.refused || !r.text) return json({ sections: rules.sections, title: rules.title, stats, source: 'rules' });
+      if (r.blocked || !r.text) return json({ sections: rules.sections, title: rules.title, stats, source: 'rules' });
       const parsed = JSON.parse(r.text) as { sections: { heading: string; body: string }[] };
       if (!Array.isArray(parsed.sections) || parsed.sections.length < 3) throw new Error('Unvollständiger Bericht');
       return json({ sections: parsed.sections, title: rules.title, stats, source: 'ai', model: r.model ?? MODEL });
