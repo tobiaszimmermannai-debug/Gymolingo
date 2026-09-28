@@ -9,7 +9,10 @@ import { useDB } from '@/data/store';
 import { useAuth } from '@/features/account';
 import { DEV_TOOLS, loadDemoData } from '@/features/devtools';
 import { Button } from '@/ui/Button';
-import { confirm } from '@/lib/dialog';
+import { confirm, notify } from '@/lib/dialog';
+import { ToggleRow } from '@/ui/Toggle';
+import { setPrefs } from '@/data/store';
+import { getHealthProvider, syncHealthSteps } from '@/lib/health';
 
 const ITEMS: { route: string; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; testID: string }[] = [
   { route: '/settings/profile', icon: 'person-outline', title: 'Profil & Ziele', sub: 'Körperdaten, Ziel, Kalorien & Makros, Trainingsplan', testID: 'settings-profile' },
@@ -44,6 +47,7 @@ export default function Settings() {
           </Pressable>
         ))}
       </Card>
+      <HealthCard />
       {DEV_TOOLS && (
         <Card variant="outline" testID="dev-tools">
           <Text variant="caption" tone="warning">
@@ -65,8 +69,35 @@ export default function Settings() {
         </Card>
       )}
       <Text variant="small" tone="muted" align="center">
-        Gymolingo 0.1 · Richtwerte, keine medizinische Beratung.
+        Gymolingo 0.1 · Richtwerte, keine medizinische Beratung.{'\n'}Produktdaten: Open Food Facts (ODbL) · Schrift: Inter (OFL)
       </Text>
     </Screen>
+  );
+}
+
+/** Only shown when a native health adapter is registered (see docs/HEALTH_INTEGRATION.md). */
+function HealthCard() {
+  const source = useDB((s) => s.prefs.healthSource ?? 'none');
+  const provider = getHealthProvider();
+  if (!provider) return null;
+  const on = source === provider.source;
+  return (
+    <Card testID="health-card">
+      <ToggleRow
+        label={`Schritte aus ${provider.label}`}
+        description="Liest Schritte und Gewicht (nur lesen). Manuelle Einträge haben Vorrang."
+        value={on}
+        testID="health-toggle"
+        onChange={async (v) => {
+          if (!v) return setPrefs({ healthSource: 'none' });
+          if (!(await provider.isAvailable()) || !(await provider.requestPermissions())) {
+            notify('Kein Zugriff', `${provider.label} ist nicht verfügbar oder der Zugriff wurde verweigert.`);
+            return;
+          }
+          setPrefs({ healthSource: provider.source });
+          void syncHealthSteps();
+        }}
+      />
+    </Card>
   );
 }

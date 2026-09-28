@@ -87,6 +87,9 @@ export default function AddFood() {
               ))}
             </Card>
           )}
+          <Text variant="small" tone="muted">
+            Produktdaten: Open Food Facts (openfoodfacts.org), Lizenz ODbL.
+          </Text>
         </Section>
       )}
 

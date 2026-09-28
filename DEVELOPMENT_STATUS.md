@@ -16,7 +16,7 @@ Letzte Aktualisierung: 2026-09-28
 | Daten | Local-first Zustand-Store (`apps/mobile/src/data`), persistiert in SQLite-KV (nativ) / IndexedDB (Web) |
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions), RLS auf allen Tabellen |
 | Sync | Outbox + Pull-Cursor (`server_updated_at`), Last-Write-Wins auf `updated_at` (Client + DB-Trigger), Soft-Deletes |
-| KI | Nur serverseitig (Edge Functions, `ANTHROPIC_API_KEY` als Secret). Statistiken kommen aus `@gymolingo/core`, das Modell interpretiert nur |
+| KI | **Standardmäßig aus (0 € Betrieb).** Optional serverseitig (Edge Functions, `ANTHROPIC_API_KEY` als Secret, `EXPO_PUBLIC_AI_ENABLED=true`). Ohne KI: regelbasierter Coach auf dem Gerät. Statistiken immer aus `@gymolingo/core` |
 | Lebensmittel | Eigene deutsche Basis-DB (~140 Einträge, Durchschnittswerte) + Open Food Facts (Suche, Barcode) + eigene Lebensmittel/Rezepte |
 | Tests | Vitest (core), pgTAP via psql (`scripts/test-db.sh`), Playwright E2E gegen den Web-Build |
 
@@ -34,7 +34,7 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Berechnung Kalorien/Makros (Mifflin-St Jeor, Aktivitätsfaktor, Zielanpassung) mit Erklärung, editierbar
 - ✅ Startplan-Generator passend zu Frequenz/Equipment/Ziel
 - ✅ Profil & Ziele nachträglich bearbeiten, Neuberechnung
-- 🟩 Registrierung/Login (Supabase Auth, E-Mail+Passwort), Gast → Konto-Übernahme – E2E gegen lokales Supabase **offen**
+- ✅ Registrierung/Login (Supabase Auth, E-Mail+Passwort), Gast → Konto-Übernahme, Wiederherstellung auf Zweitgerät (E2E gegen lokales Supabase)
 
 ### 3. Gym Tracking
 - ✅ Pläne erstellen/bearbeiten (Tage, Übungen, Sätze, Wdh.-Bereich, RIR, Pause, Gewichtsschritt, Reihenfolge, fester Wochentag)
@@ -49,8 +49,8 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Suche (deutsche Basis-DB, eigene, Rezepte, Open Food Facts), Portionen, Mahlzeiten
 - ✅ Kalorien/Makros/Ballaststoffe, verbleibend, Tages- & Wochenverlauf
 - ✅ Eigene Lebensmittel (Plausibilitätsprüfung), Rezepte, Mahlzeit wiederholen, Schnelleintrag
-- 🟩 Barcode-Scanner (expo-camera, EAN/UPC) + manuelle Eingabe; OFF-Abfrage ist in dieser Sandbox netzwerkseitig blockiert → nur mit Mocks getestet
-- 🟩 KI-Foto-Erkennung: UI fertig, Edge Function **in Arbeit**
+- 🟩 Barcode-Scanner (expo-camera, EAN/UPC) + manuelle Eingabe; OFF-Abfrage ist in dieser Sandbox netzwerkseitig blockiert → nur mit Mocks getestet; ODbL-Namensnennung in App
+- 🟩 KI-Foto-Erkennung: UI + Edge Function `meal-photo` fertig (501 ohne Key); Button nur sichtbar, wenn KI aktiviert – ohne echten Key nicht live getestet
 - ✅ Schätzungen gekennzeichnet (~) und korrigierbar
 - ✅ Individuelle Ernährungstipps aus echten Daten
 
@@ -59,7 +59,7 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Körpermaße mit Verlauf
 - 🟩 Fortschrittsbilder (lokal + privater Storage-Bucket) – Upload gegen Supabase noch nicht E2E getestet
 - ✅ Abendlicher Check-in mit Schrittzahl (manuell)
-- 🟩 Apple Health / Health Connect: Abstraktion + Adapter vorbereitet (`src/lib/health`), Aktivierung siehe `docs/HEALTH_INTEGRATION.md` (benötigt Dev-Build)
+- 🟩 Apple Health / Health Connect: Abstraktion, Adapter, Einstellungs-Schalter vorbereitet (`src/lib/health`), Aktivierung siehe `docs/HEALTH_INTEGRATION.md` (benötigt Dev-Build, nicht getestet)
 
 ### 6. Reminder & Motivation
 - ✅ Reminder-Engine (core, getestet): Morgen, Gewicht, Ernährung, Vor/Nach Training, Protein, Abend-Eskalation, Wochenbericht
@@ -75,13 +75,13 @@ Letzte Aktualisierung: 2026-09-28
 ### 8. Community
 - ✅ DB: Freundschaften, Challenges, Ranglisten, Freundesprofil mit Privatsphäre-Filter (pgTAP getestet)
 - ✅ Privatsphäre-Einstellungen (Gewicht/KFA/Ernährung/Fotos standardmäßig privat)
-- ⬜ Community-Screens (Suche, Anfragen, Freundesliste, Profil, Rangliste, private Challenges) – **nächste Aufgabe nach KI-Coach**
+- ✅ Community-Screens (Benutzername, Suche, Anfragen, Freundesliste, Freundesprofil, Ranglisten, private Challenges) – E2E mit Backend inkl. Privatsphäre-Durchsetzung
 
 ### 9. KI-Coach
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
-- 🟨 Edge Functions `coach` (Chat + Wochenbericht) und `meal-photo` mit Anthropic API
-- ⬜ Coach-Chat-Screen + Wochenbericht-Screen
+- ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung
+- 🟩 Edge Functions `coach` (Chat + Wochenbericht, JSON-Schema, Fallback auf Regeln) und `meal-photo` – lokal mit Deno getestet (ohne Key → Regeln / 501)
 
 ### 10. Progress-Dashboard
 - ✅ Zeiträume 7T/30T/90T/6M/1J/Alles, Vergleich zur Vorperiode, Gewicht, Kraft, Volumen, Muskelgruppen, Kalorien, Protein, Schritte, Serien, PRs
@@ -89,20 +89,23 @@ Letzte Aktualisierung: 2026-09-28
 ### 11. Technik
 - ✅ Monorepo, TypeScript strict, Supabase-Migrationen, RLS, keine API-Keys im Frontend
 - ✅ Offline-fähige Erfassung, LWW-Sync-Engine (getestet)
-- 🟩 Sync gegen echtes Supabase (lokal) – E2E **offen**
+- ✅ Sync gegen echtes Supabase (lokal): Zwei-Geräte-Sync, Offline-Erfassung + späterer Sync (früher Abbruch, Timeouts, onLine-Check)
+- ✅ Performance mit 2 Jahren Daten (Streaks/XP/Bericht < 35 ms, `useDeferredValue` auf Home)
+- 🟩 Fortschrittsbilder-Upload in privaten Bucket – nicht E2E getestet
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
-- ✅ core: 96 Unit-Tests (Vitest)
+- ✅ core: 101 Unit-Tests (Vitest)
 - ✅ DB: 30 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre)
-- ✅ E2E (Playwright, Web-Build): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen
-- ⬜ E2E mit Backend: Registrierung, Login, Sync zwischen zwei Browsern, Freunde
+- ✅ E2E lokal (10): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach
+- ✅ E2E Backend (4): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync
 
 ## Fehlende API-Schlüssel / Konfiguration
 
 | Schlüssel | Wo | Wofür |
 |---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `apps/mobile/.env` | Konto, Sync, Community, KI (ohne: lokaler Modus) |
+| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `apps/mobile/.env` | Konto, Sync, Community (ohne: lokaler Modus). Free-Plan reicht |
+| `EXPO_PUBLIC_AI_ENABLED` | `apps/mobile/.env` | `true` schaltet KI-Funktionen ein – **kostenpflichtig**, Standard `false` |
 | `ANTHROPIC_API_KEY` | Supabase Secret (`supabase secrets set`) | KI-Coach, KI-Wochenbericht, Foto-Erkennung (ohne: regelbasierter Coach) |
 | EAS `projectId` | `app.json` | nur für Server-Push-Tokens (optional) |
 
@@ -111,11 +114,19 @@ Letzte Aktualisierung: 2026-09-28
 - Native Builds (iOS/Android) konnten in der Sandbox nicht erzeugt werden; getestet wird der Web-Build. Native-spezifische Module (Kamera, Notifications, SQLite-KV, FileSystem) sind typgeprüft.
 - `supabase test db` kann das pg_prove-Image nicht laden → `scripts/test-db.sh` führt dieselben pgTAP-Dateien via psql aus.
 
+## Entscheidungen
+- **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
+- Trends/PRs/Plateaus mit reinem Epley-e1RM; RIR-bereinigter e1RM nur für die Größe von Gewichtssprüngen. Kraftveränderung = Median der Sitzungsbestwerte.
+- Wochenbericht wird live aus den Daten berechnet; gespeichert nur, wenn die Woche Daten hat; KI-Text bleibt, bis er erzwungen neu erzeugt wird.
+- Web persistiert sofort (IndexedDB), nativ mit 150 ms Debounce + Flush bei App-Wechsel.
+- Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
+
 ## Letzter erfolgreich getesteter Stand
-- Commit nach „Add body tracking, check-in, progress dashboard …": core 96/96, DB 30/30, E2E 11/11 grün.
+- Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 10/10, E2E Backend 4/4, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. `claude-api`-Referenz laden, Edge Functions `coach` + `meal-photo` implementieren (Deno), `packages/core` per esbuild nach `supabase/functions/_shared/core.js` bündeln.
-2. Coach-Screens (`/coach`, `/coach/report`) mit Fallback auf regelbasierten Coach.
-3. Community-Screens.
-4. Web-Build mit lokalem Supabase: E2E für Registrierung/Login/Sync/Freunde.
+1. App-Icon & Splash im Gymolingo-Branding (aktuell Expo-Standard) – `assets/images`, `app.json`.
+2. PWA: Web-Manifest + Service Worker für Offline-Start der Web-Version (kostenloses Hosting).
+3. E2E für Fortschrittsbilder-Upload gegen lokales Supabase-Storage.
+4. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
+5. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

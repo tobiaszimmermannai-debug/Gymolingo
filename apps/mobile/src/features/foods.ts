@@ -25,7 +25,7 @@ import { requestSync } from '@/data/sync';
 export const SOURCE_LABEL: Record<string, string> = {
   builtin: 'Basis-Datenbank · Durchschnittswert',
   custom: 'Eigenes Lebensmittel',
-  off: 'Open Food Facts · Herstellerangaben (Community)',
+  off: 'Open Food Facts (ODbL) · Herstellerangaben, von der Community gepflegt',
   ai: 'KI-Schätzung',
   recipe: 'Eigenes Rezept',
 };
