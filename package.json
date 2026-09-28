@@ -1,0 +1,21 @@
+{
+  "name": "gymolingo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Gymolingo – Gym, Nutrition & AI Progress App (Expo + Supabase monorepo)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @gymolingo/core && npm run test -w mobile",
+    "typecheck": "npm run typecheck -w @gymolingo/core && npm run typecheck -w mobile",
+    "db:start": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase start -x studio,imgproxy,vector,logflare,postgres-meta,mailpit,supavisor",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "web": "npm run web -w mobile"
+  },
+  "devDependencies": {
+    "supabase": "2.118.0"
+  }
+}
