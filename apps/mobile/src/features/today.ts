@@ -2,7 +2,7 @@
  * Derived "today" state shared by Home, reminders and the tab badges.
  * All numbers come from the core package (tested, deterministic).
  */
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import {
   buildDailyActivities,
   buildStreakInput,
@@ -96,7 +96,8 @@ export function useBadgeStats(data: UserData, streaks: Record<StreakKind, Streak
 
 /** Everything the Home screen and the reminder engine need for today. */
 export function useTodayState() {
-  const data = useUserData();
+  // heavy aggregations run in a deferred render so logging stays instant
+  const data = useDeferredValue(useUserData());
   const lookup = useExerciseLookup();
   const structure = useActivePlan();
   const today = todayISO();

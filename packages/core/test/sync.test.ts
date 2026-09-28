@@ -97,6 +97,22 @@ describe('sync engine', () => {
     expect(a.tables.meals.m1.kcal).toBe(5);
   });
 
+  it('stops early on network errors (offline)', async () => {
+    const remote = new MemRemote();
+    let calls = 0;
+    remote.push = async () => {
+      calls++;
+      throw new Error('TypeError: Failed to fetch');
+    };
+    const a = new MemLocal();
+    a.write('t1', row('a', '2026-01-01'));
+    a.write('t2', row('b', '2026-01-01'));
+    const rep = await syncAll(['t1', 't2'], a, remote);
+    expect(calls).toBe(1);
+    expect(rep.errors).toHaveLength(1);
+    expect(a.getDirty('t1')).toHaveLength(1);
+  });
+
   it('strips local-only fields', () => {
     expect(stripLocalFields(row('p', 't', { local_uri: 'file://x', _tmp: 1, server_updated_at: 'z', note: 'n' }))).toEqual(row('p', 't', { note: 'n' }));
   });

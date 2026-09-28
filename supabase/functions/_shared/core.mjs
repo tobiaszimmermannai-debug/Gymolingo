@@ -298,8 +298,23 @@ var MEAL_LABELS_DE = {
   dinner: "Abendessen",
   snack: "Snacks"
 };
+var byDateCache = /* @__PURE__ */ new WeakMap();
+function mealsByDate(all) {
+  let m = byDateCache.get(all);
+  if (!m) {
+    m = /* @__PURE__ */ new Map();
+    for (const e of all) {
+      if (e.deleted) continue;
+      const arr = m.get(e.date);
+      if (arr) arr.push(e);
+      else m.set(e.date, [e]);
+    }
+    byDateCache.set(all, m);
+  }
+  return m;
+}
 function dayNutrition(date, all) {
-  const entries = all.filter((e) => !e.deleted && e.date === date);
+  const entries = mealsByDate(all).get(date) ?? [];
   const byMeal = Object.fromEntries(
     MEAL_ORDER.map((m) => [m, sumTotals(entries.filter((e) => e.meal === m))])
   );
@@ -1820,8 +1835,9 @@ function planRemindersForDay(settings, st, nowMin) {
     const offsets = [0, 60, 105];
     const quietStart = timeToMinutes(settings.quiet_start);
     const streakTxt = settings.streak_enabled && st.streakAtRisk && st.streakAtRisk.days >= 2 ? ` Deine ${st.streakAtRisk.days}-Tage-Serie (${st.streakAtRisk.label}) l\xE4uft weiter, wenn du heute abschlie\xDFt.` : "";
+    const mealsTxt = settings.nutrition_enabled && st.mealsLogged < 2 ? " Falls noch Mahlzeiten fehlen, kannst du sie dabei nachtragen." : "";
     const bodies = [
-      `Wie viele Schritte hattest du heute? Dein Tagesabschluss dauert nur 30 Sekunden.${streakTxt}`,
+      `Wie viele Schritte hattest du heute? Dein Tagesabschluss dauert nur 30 Sekunden.${mealsTxt}${streakTxt}`,
       `Kurzer Check-in? Schritte eintragen, Tag abschlie\xDFen \u2013 fertig.${streakTxt}`,
       `Letzte Erinnerung f\xFCr heute: 30 Sekunden f\xFCr deinen Tagesabschluss, danach ist Ruhe. \u{1F634}`
     ];
@@ -2027,9 +2043,8 @@ function buildWeeklyReport(data, weekStartDate, opts = {}) {
     const k = `${e.exercise_id}:${e.type}`;
     if (!bestPr.has(k) || bestPr.get(k).value < e.value) bestPr.set(k, e);
   }
-  const trainedThisWeek = new Set(
-    data.sets.filter((s) => isWorkingSet(s) && data.sessions.some((x) => x.id === s.session_id && x.status === "completed" && !x.deleted && x.date >= ws && x.date <= we)).map((s) => s.exercise_id)
-  );
+  const weekSessionIds = new Set(data.sessions.filter((x) => x.status === "completed" && !x.deleted && x.date >= ws && x.date <= we).map((x) => x.id));
+  const trainedThisWeek = new Set(data.sets.filter((s) => isWorkingSet(s) && weekSessionIds.has(s.session_id)).map((s) => s.exercise_id));
   const plateaus = [...trainedThisWeek].filter((id) => detectPlateau(exerciseHistory(id, data.sessions, data.sets).filter((h) => h.date <= we))).map(name);
   const done = data.sessions.filter((s) => !s.deleted && s.status === "completed" && s.date >= ws && s.date <= we);
   const schedule = {
@@ -2493,9 +2508,11 @@ function mergeRemoteRows(local, table, rows) {
 }
 var PUSH_BATCH = 200;
 var PULL_LIMIT = 500;
-async function syncAll(tables, local, remote, now = () => /* @__PURE__ */ new Date(), overlapMs = 3e4) {
+async function syncAll(tables, local, remote, now = () => /* @__PURE__ */ new Date(), overlapMs = 3e4, isFatal = (m) => /failed to fetch|network|timeout|disconnected|offline/i.test(m)) {
   const report = { pushed: {}, pulled: {}, errors: [], startedAt: now().toISOString(), finishedAt: "" };
+  const fatal = () => report.errors.some((e) => isFatal(e.message));
   for (const table of tables) {
+    if (fatal()) break;
     const dirty = local.getDirty(table);
     if (!dirty.length) continue;
     try {
@@ -2510,6 +2527,7 @@ async function syncAll(tables, local, remote, now = () => /* @__PURE__ */ new Da
     }
   }
   for (const table of tables) {
+    if (fatal()) break;
     try {
       const stored = local.getCursor(table);
       let cursor = stored ? new Date(new Date(stored).getTime() - overlapMs).toISOString() : null;
@@ -3014,6 +3032,7 @@ export {
   lastPerformedSets,
   levelFromXp,
   linearSlope,
+  mealsByDate,
   mergeRemoteRows,
   mifflinStJeor,
   minutesToTime,

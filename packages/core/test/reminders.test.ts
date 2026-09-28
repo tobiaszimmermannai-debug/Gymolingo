@@ -71,6 +71,13 @@ describe('reminder engine', () => {
     for (const bad of ['versagt', 'faul', 'enttäusch', 'schäm', 'schuld']) expect(text).not.toContain(bad);
   });
 
+  it('evening reminder mentions missing meals only when few are logged', () => {
+    const few = planRemindersForDay({ ...DEFAULT_REMINDER_SETTINGS, max_per_day: 20 }, state({ mealsLogged: 1 }), null).find((x) => x.category === 'evening' && x.tier === 1)!;
+    expect(few.body).toContain('Mahlzeiten');
+    const many = planRemindersForDay({ ...DEFAULT_REMINDER_SETTINGS, max_per_day: 20 }, state({ mealsLogged: 4 }), null).find((x) => x.category === 'evening' && x.tier === 1)!;
+    expect(many.body).not.toContain('Mahlzeiten');
+  });
+
   it('unfinished workout reminder 2h after start', () => {
     const r = planRemindersForDay({ ...DEFAULT_REMINDER_SETTINGS, max_per_day: 20 }, state({ activeWorkoutStartedMin: 18 * 60 }), null);
     expect(r.find((x) => x.category === 'post_workout')?.time).toBe('20:00');

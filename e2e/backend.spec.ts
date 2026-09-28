@@ -146,3 +146,39 @@ test('account deletion removes server data', async ({ page, browser }) => {
   await b.getByTestId('auth-submit').click();
   await expect(b.getByTestId('auth-error')).toHaveText('E-Mail oder Passwort ist falsch.');
 });
+
+test('offline logging is kept locally and synced when back online', async ({ page, browser, context }) => {
+  const email = `offline-${run}@example.com`;
+  await register(page, 'Olli', email);
+  await syncNow(page);
+  await page.goto('/');
+  await expect(page.getByTestId('home-screen')).toBeVisible();
+  await context.setOffline(true);
+  // in-app navigation only (no page loads while offline)
+  await page.getByTestId('tab-nutrition').click();
+  await page.getByTestId('add-dinner').click();
+  await page.getByTestId('action-quick').click();
+  await page.getByTestId('quick-kcal').fill('777');
+  await page.getByTestId('quick-save').click();
+  await expect(page.getByTestId('meal-dinner')).toContainText('777 kcal');
+  await page.getByTestId('tab-index').click();
+  await page.getByTestId('open-settings').click();
+  await page.getByTestId('settings-account').click();
+  await page.getByTestId('sync-now').click();
+  await expect(page.getByText(/offline – Änderungen werden später übertragen/)).toBeVisible();
+  await expect(page.getByText(/Änderungen ausstehend/)).toBeVisible();
+
+  await context.setOffline(false);
+  await page.getByTestId('sync-now').click();
+  await expect(page.getByText(/Status: synchronisiert/)).toBeVisible();
+  await expect(page.getByText('Änderungen ausstehend')).toHaveCount(0);
+
+  const b = await newPage(browser);
+  await b.goto('/auth?mode=signin');
+  await b.getByTestId('auth-email').fill(email);
+  await b.getByTestId('auth-password').fill(pw);
+  await b.getByTestId('auth-submit').click();
+  await expect(b.getByTestId('home-screen')).toBeVisible();
+  await b.getByTestId('tab-nutrition').click();
+  await expect(b.getByTestId('meal-dinner')).toContainText('777 kcal');
+});

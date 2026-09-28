@@ -1,6 +1,7 @@
 /**
  * Connects the core sync engine to the local store and Supabase.
  */
+import NetInfo from '@react-native-community/netinfo';
 import { syncAll, type LocalAdapter, type RemoteAdapter, type SyncRow } from '@gymolingo/core';
 import { supabase } from '@/lib/supabase';
 import { applyRemoteRows, markClean, setCursor, setSyncStatus, useDB } from './store';
@@ -35,17 +36,22 @@ const localAdapter: LocalAdapter = {
   },
 };
 
+/** Rejects after `ms` – network calls must never block the sync state forever. */
+function withTimeout<T>(p: PromiseLike<T>, ms = 12000): Promise<T> {
+  return Promise.race([Promise.resolve(p), new Promise<T>((_, reject) => setTimeout(() => reject(new Error('network timeout')), ms))]);
+}
+
 const remoteAdapter: RemoteAdapter = {
   async push(table, rows) {
     if (!supabase) throw new Error('Backend nicht konfiguriert');
-    const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
+    const { error } = await withTimeout(supabase.from(table).upsert(rows, { onConflict: 'id' }));
     if (error) throw new Error(`${error.code ?? ''} ${error.message}`.trim());
   },
   async pull(table, since, limit) {
     if (!supabase) throw new Error('Backend nicht konfiguriert');
     let q = supabase.from(table).select('*').order('server_updated_at', { ascending: true }).limit(limit);
     if (since) q = q.gt('server_updated_at', since);
-    const { data, error } = await q;
+    const { data, error } = await withTimeout(q);
     if (error) throw new Error(`${error.code ?? ''} ${error.message}`.trim());
     return (data ?? []) as SyncRow[];
   },
@@ -65,9 +71,16 @@ export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
   }
   let result: { ok: boolean; message?: string } = { ok: true };
   running = (async () => {
+    // navigator.onLine / OS connectivity: skip network work when definitely offline
+    const offlineNow = typeof navigator !== 'undefined' && 'onLine' in navigator ? navigator.onLine === false : (await NetInfo.fetch().catch(() => null))?.isConnected === false;
+    if (offlineNow) {
+      setSyncStatus({ syncState: 'offline', syncError: null });
+      result = { ok: false, message: 'offline' };
+      return;
+    }
     setSyncStatus({ syncState: 'syncing', syncError: null });
     try {
-      const { data } = await supabase!.auth.getSession();
+      const { data } = await withTimeout(supabase!.auth.getSession(), 15000);
       if (!data.session) {
         setSyncStatus({ syncState: 'error', syncError: 'Sitzung abgelaufen – bitte erneut anmelden' });
         result = { ok: false, message: 'Sitzung abgelaufen' };
@@ -75,7 +88,7 @@ export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
       }
       const report = await syncAll(TABLES, localAdapter, remoteAdapter);
       if (report.errors.length) {
-        const offline = report.errors.every((e) => /fetch|network|Failed to fetch|timeout/i.test(e.message));
+        const offline = report.errors.every((e) => /fetch|network|timeout|disconnected/i.test(e.message));
         const msg = report.errors.map((e) => `${e.table}: ${e.message}`).join('; ');
         setSyncStatus({ syncState: offline ? 'offline' : 'error', syncError: msg });
         result = { ok: false, message: msg };

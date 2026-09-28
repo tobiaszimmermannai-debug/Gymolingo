@@ -217,8 +217,9 @@ export function planRemindersForDay(settings: Settings, st: ReminderDayState, no
       settings.streak_enabled && st.streakAtRisk && st.streakAtRisk.days >= 2
         ? ` Deine ${st.streakAtRisk.days}-Tage-Serie (${st.streakAtRisk.label}) läuft weiter, wenn du heute abschließt.`
         : '';
+    const mealsTxt = settings.nutrition_enabled && st.mealsLogged < 2 ? ' Falls noch Mahlzeiten fehlen, kannst du sie dabei nachtragen.' : '';
     const bodies = [
-      `Wie viele Schritte hattest du heute? Dein Tagesabschluss dauert nur 30 Sekunden.${streakTxt}`,
+      `Wie viele Schritte hattest du heute? Dein Tagesabschluss dauert nur 30 Sekunden.${mealsTxt}${streakTxt}`,
       `Kurzer Check-in? Schritte eintragen, Tag abschließen – fertig.${streakTxt}`,
       `Letzte Erinnerung für heute: 30 Sekunden für deinen Tagesabschluss, danach ist Ruhe. 😴`,
     ];

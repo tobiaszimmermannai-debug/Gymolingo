@@ -104,11 +104,8 @@ export function buildWeeklyReport(
     const k = `${e.exercise_id}:${e.type}`;
     if (!bestPr.has(k) || bestPr.get(k)!.value < e.value) bestPr.set(k, e);
   }
-  const trainedThisWeek = new Set(
-    data.sets
-      .filter((s) => isWorkingSet(s) && data.sessions.some((x) => x.id === s.session_id && x.status === 'completed' && !x.deleted && x.date >= ws && x.date <= we))
-      .map((s) => s.exercise_id),
-  );
+  const weekSessionIds = new Set(data.sessions.filter((x) => x.status === 'completed' && !x.deleted && x.date >= ws && x.date <= we).map((x) => x.id));
+  const trainedThisWeek = new Set(data.sets.filter((s) => isWorkingSet(s) && weekSessionIds.has(s.session_id)).map((s) => s.exercise_id));
   const plateaus = [...trainedThisWeek].filter((id) => detectPlateau(exerciseHistory(id, data.sessions, data.sets).filter((h) => h.date <= we))).map(name);
 
   // ---------- consistency

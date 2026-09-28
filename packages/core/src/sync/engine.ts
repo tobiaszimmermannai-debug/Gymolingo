@@ -78,11 +78,15 @@ export async function syncAll(
   remote: RemoteAdapter,
   now: () => Date = () => new Date(),
   overlapMs = 30_000,
+  /** Return true for errors that make further requests pointless (e.g. offline) → stop early. */
+  isFatal: (message: string) => boolean = (m) => /failed to fetch|network|timeout|disconnected|offline/i.test(m),
 ): Promise<SyncReport> {
   const report: SyncReport = { pushed: {}, pulled: {}, errors: [], startedAt: now().toISOString(), finishedAt: '' };
+  const fatal = () => report.errors.some((e) => isFatal(e.message));
 
   // 1) push in dependency order
   for (const table of tables) {
+    if (fatal()) break;
     const dirty = local.getDirty(table);
     if (!dirty.length) continue;
     try {
@@ -101,6 +105,7 @@ export async function syncAll(
 
   // 2) pull
   for (const table of tables) {
+    if (fatal()) break;
     try {
       const stored = local.getCursor(table);
       let cursor = stored ? new Date(new Date(stored).getTime() - overlapMs).toISOString() : null;

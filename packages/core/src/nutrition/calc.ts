@@ -77,8 +77,28 @@ export const MEAL_LABELS_DE: Record<MealType, string> = {
   snack: 'Snacks',
 };
 
+/**
+ * Entries grouped by date, cached per array instance (arrays from the store are
+ * immutable snapshots), so per-day lookups are O(1) instead of O(n).
+ */
+const byDateCache = new WeakMap<readonly MealEntry[], Map<ISODate, MealEntry[]>>();
+export function mealsByDate(all: readonly MealEntry[]): Map<ISODate, MealEntry[]> {
+  let m = byDateCache.get(all);
+  if (!m) {
+    m = new Map();
+    for (const e of all) {
+      if (e.deleted) continue;
+      const arr = m.get(e.date);
+      if (arr) arr.push(e);
+      else m.set(e.date, [e]);
+    }
+    byDateCache.set(all, m);
+  }
+  return m;
+}
+
 export function dayNutrition(date: ISODate, all: MealEntry[]): DayNutrition {
-  const entries = all.filter((e) => !e.deleted && e.date === date);
+  const entries = mealsByDate(all).get(date) ?? [];
   const byMeal = Object.fromEntries(
     MEAL_ORDER.map((m) => [m, sumTotals(entries.filter((e) => e.meal === m))]),
   ) as Record<MealType, MacroTotals>;
