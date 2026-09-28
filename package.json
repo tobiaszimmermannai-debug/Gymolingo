@@ -19,7 +19,9 @@
     "test:core": "npm run test -w @gymolingo/core",
     "test:db": "./scripts/test-db.sh",
     "test:e2e": "playwright test",
-    "build:edge-core": "npm run build:edge -w @gymolingo/core"
+    "build:edge-core": "npm run build:edge -w @gymolingo/core",
+    "db:seed-demo": "node scripts/seed-demo.mjs",
+    "build:web:test": "cd apps/mobile && EXPO_PUBLIC_DEV_TOOLS=true expo export --platform web --output-dir dist --clear"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

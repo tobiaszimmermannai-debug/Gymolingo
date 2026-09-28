@@ -7,6 +7,9 @@ import { Card } from '@/ui/Card';
 import { colors, spacing } from '@/ui/theme';
 import { useDB } from '@/data/store';
 import { useAuth } from '@/features/account';
+import { DEV_TOOLS, loadDemoData } from '@/features/devtools';
+import { Button } from '@/ui/Button';
+import { confirm } from '@/lib/dialog';
 
 const ITEMS: { route: string; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; testID: string }[] = [
   { route: '/settings/profile', icon: 'person-outline', title: 'Profil & Ziele', sub: 'Körperdaten, Ziel, Kalorien & Makros, Trainingsplan', testID: 'settings-profile' },
@@ -41,6 +44,26 @@ export default function Settings() {
           </Pressable>
         ))}
       </Card>
+      {DEV_TOOLS && (
+        <Card variant="outline" testID="dev-tools">
+          <Text variant="caption" tone="warning">
+            Entwicklung
+          </Text>
+          <Button
+            title="Demo-Daten laden (12 Wochen)"
+            size="sm"
+            variant="secondary"
+            style={{ marginTop: spacing.sm }}
+            testID="load-demo"
+            onPress={async () => {
+              if (await confirm('Demo-Daten laden?', 'Fügt 12 Wochen realistische Beispieldaten hinzu (nur für Tests).', 'Laden')) {
+                loadDemoData();
+                router.replace('/');
+              }
+            }}
+          />
+        </Card>
+      )}
       <Text variant="small" tone="muted" align="center">
         Gymolingo 0.1 · Richtwerte, keine medizinische Beratung.
       </Text>

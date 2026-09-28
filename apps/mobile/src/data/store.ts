@@ -4,7 +4,7 @@
  * the sync engine. Rows mirror the Postgres tables exactly.
  */
 import { create } from 'zustand';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import type { BaseRow } from '@gymolingo/core';
 import { kv } from './kv';
@@ -75,7 +75,9 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void flush(), 150);
+  // web: persist right after the current burst of writes (tabs can be closed any time);
+  // native: small debounce, plus a flush when the app goes to the background
+  saveTimer = setTimeout(() => void flush(), Platform.OS === 'web' ? 0 : 150);
 }
 
 export async function flush() {

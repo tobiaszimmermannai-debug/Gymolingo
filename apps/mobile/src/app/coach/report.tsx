@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { View } from 'react-native';
 import { addDays, formatDateDE, startOfWeek, todayISO, type Recommendation } from '@gymolingo/core';
 import { Screen, Row } from '@/ui/Screen';
@@ -7,22 +8,22 @@ import { Card } from '@/ui/Card';
 import { Button, IconButton } from '@/ui/Button';
 import { Badge } from '@/ui/Chip';
 import { spacing } from '@/ui/theme';
-import { useRows } from '@/data/hooks';
-import { autoReportWeek, ensureWeeklyReport } from '@/features/coach';
+import { autoReportWeek, ensureWeeklyReport, type ReportView } from '@/features/coach';
 
 export default function WeeklyReport() {
   const [week, setWeek] = useState(autoReportWeek());
   const [busy, setBusy] = useState(false);
-  const reports = useRows('ai_reports');
-  const report = useMemo(() => reports.find((r) => r.week_start === week), [reports, week]);
+  const [report, setReport] = useState<ReportView | null>(null);
   const current = startOfWeek(todayISO());
 
-  useEffect(() => {
-    if (!report && week <= current) {
+  useFocusEffect(
+    useCallback(() => {
       setBusy(true);
-      ensureWeeklyReport(week).finally(() => setBusy(false));
-    }
-  }, [week, report, current]);
+      ensureWeeklyReport(week)
+        .then(setReport)
+        .finally(() => setBusy(false));
+    }, [week]),
+  );
 
   const content = report?.content as { title?: string; sections?: { heading: string; body: string }[] } | undefined;
   const recs = ((report?.stats as { recommendations?: Recommendation[] } | undefined)?.recommendations ?? []) as Recommendation[];
@@ -68,14 +69,14 @@ export default function WeeklyReport() {
             </View>
           )}
           <Button
-            title="Neu berechnen"
+            title={report.source === 'ai' ? 'KI-Bericht neu erstellen' : 'Neu berechnen'}
             variant="secondary"
             icon="refresh"
             loading={busy}
             testID="regenerate-report"
             onPress={async () => {
               setBusy(true);
-              await ensureWeeklyReport(week, true);
+              setReport(await ensureWeeklyReport(week, true));
               setBusy(false);
             }}
           />

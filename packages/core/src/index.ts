@@ -20,3 +20,4 @@ export * from './coach/offline';
 export * from './sync/engine';
 export * from './training/templates';
 export * from './nutrition/tips';
+export * from './dev/demo';

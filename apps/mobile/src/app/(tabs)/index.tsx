@@ -34,12 +34,11 @@ export default function Home() {
     <Screen tabBarPadding testID="home-screen">
       <Row style={{ paddingTop: spacing.md }}>
         <View style={{ flex: 1 }}>
-          <Text variant="small" tone="secondary">
-            {WEEKDAY_LONG_DE[weekdayIndex(t.today)]}, {formatDateDE(t.today)}
+          <Text variant="small" tone="secondary" numberOfLines={1}>
+            {WEEKDAY_LONG_DE[weekdayIndex(t.today)]}, {formatDateDE(t.today)} · {greeting}
           </Text>
-          <Text variant="h2" numberOfLines={1}>
-            {greeting}
-            {p.display_name ? `, ${p.display_name}` : ''} 👋
+          <Text variant="h1" numberOfLines={1}>
+            {p.display_name || 'Hallo'} 👋
           </Text>
         </View>
         <SyncBadge />
@@ -66,11 +65,11 @@ export default function Home() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </Row>
-          <Row gap={spacing.sm} wrap style={{ marginTop: spacing.md }}>
+          <Row gap={6} wrap style={{ marginTop: spacing.md }}>
             {streakKinds.map((k) => {
               const s = t.streaks[k];
               return (
-                <View key={k} accessibilityLabel={`${STREAK_LABELS_DE[k]}: ${s.current} Tage`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: s.todayDone ? colors.accentSoft : colors.surface2, borderWidth: 1, borderColor: s.atRisk ? colors.warning : 'transparent' }}>
+                <View key={k} accessibilityLabel={`${STREAK_LABELS_DE[k]}: ${s.current} Tage`} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: s.todayDone ? colors.accentSoft : colors.surface2, borderWidth: 1, borderColor: s.atRisk ? colors.warning : 'transparent' }}>
                   <Text variant="small">{STREAK_ICONS[k]}</Text>
                   <Text variant="smallMedium" tone={s.todayDone ? 'accent' : 'default'}>
                     {s.current}

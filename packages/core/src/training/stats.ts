@@ -1,7 +1,7 @@
 import type { ISODate } from '../dates';
 import { addDays, startOfWeek } from '../dates';
 import type { ExerciseDef, MuscleGroup, WorkoutSession, WorkoutSet } from '../types';
-import { effectiveRir, estimate1RM } from './oneRm';
+import { estimate1RM } from './oneRm';
 import type { ExerciseSession } from './progression';
 
 export const isWorkingSet = (s: Pick<WorkoutSet, 'set_type' | 'completed' | 'deleted' | 'reps'>) =>
@@ -100,7 +100,7 @@ export function computePersonalRecords(sessions: WorkoutSession[], sets: Workout
     if (!firstSession.has(s.exercise_id)) firstSession.set(s.exercise_id, s.session_id);
     const isFirstSession = firstSession.get(s.exercise_id) === s.session_id;
     const base = { exercise_id: s.exercise_id, weight_kg: s.weight_kg, reps: s.reps, date: session.date, session_id: s.session_id, set_id: s.id };
-    const e1 = Math.round(estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0) * 10) / 10;
+    const e1 = Math.round(estimate1RM(s.weight_kg, s.reps, 0) * 10) / 10;
 
     if (s.weight_kg > 0 && (!rec.maxWeight || s.weight_kg > rec.maxWeight.value)) {
       const r: PersonalRecord = { ...base, type: 'weight', value: s.weight_kg };
@@ -249,10 +249,7 @@ export function e1rmSeries(exerciseId: string, sessions: WorkoutSession[], sets:
   return hist
     .map((h) => ({
       date: h.date,
-      e1rm:
-        Math.round(
-          h.sets.reduce((m, s) => Math.max(m, estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0)), 0) * 10,
-        ) / 10,
+      e1rm: Math.round(h.sets.reduce((m, s) => Math.max(m, estimate1RM(s.weight_kg, s.reps, 0)), 0) * 10) / 10,
       topWeight: h.sets.reduce((m, s) => Math.max(m, s.weight_kg), 0),
     }))
     .reverse();
@@ -266,8 +263,10 @@ export function mostTrainedExercises(sets: WorkoutSet[], limit = 5): string[] {
 }
 
 /**
- * Strength change between two periods: average relative change of the best
- * e1RM for exercises trained in both periods.
+ * Strength change between two periods: for every exercise trained in both
+ * periods the *median* of the per-session best e1RM (Epley, performed reps) is
+ * compared – robust against single good or bad days. Returns the average
+ * relative change.
  */
 export function strengthChange(
   sessions: WorkoutSession[],
@@ -276,19 +275,27 @@ export function strengthChange(
   prev: { from: ISODate; to: ISODate },
 ): { pct: number | null; exercises: { exercise_id: string; prev: number; cur: number; pct: number }[] } {
   const sessionDates = new Map(sessions.filter((s) => !s.deleted && s.status === 'completed').map((s) => [s.id, s.date]));
-  const best = (from: ISODate, to: ISODate) => {
-    const m = new Map<string, number>();
+  const medianOfSessionBests = (from: ISODate, to: ISODate) => {
+    const perSession = new Map<string, Map<string, number>>(); // exercise -> session -> best
     for (const s of sets) {
       if (!isWorkingSet(s)) continue;
       const d = sessionDates.get(s.session_id);
       if (!d || d < from || d > to) continue;
-      const v = estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0);
-      if (v > (m.get(s.exercise_id) ?? 0)) m.set(s.exercise_id, v);
+      const v = estimate1RM(s.weight_kg, s.reps, 0);
+      const m = perSession.get(s.exercise_id) ?? new Map<string, number>();
+      if (v > (m.get(s.session_id) ?? 0)) m.set(s.session_id, v);
+      perSession.set(s.exercise_id, m);
     }
-    return m;
+    const out = new Map<string, number>();
+    for (const [id, m] of perSession) {
+      const vals = [...m.values()].sort((a, b) => a - b);
+      const mid = Math.floor(vals.length / 2);
+      out.set(id, vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2);
+    }
+    return out;
   };
-  const a = best(prev.from, prev.to);
-  const b = best(cur.from, cur.to);
+  const a = medianOfSessionBests(prev.from, prev.to);
+  const b = medianOfSessionBests(cur.from, cur.to);
   const exercises: { exercise_id: string; prev: number; cur: number; pct: number }[] = [];
   for (const [id, p] of a) {
     const c = b.get(id);

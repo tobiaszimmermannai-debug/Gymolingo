@@ -63,12 +63,20 @@ export function workingSets(sets: SetPerformance[]): SetPerformance[] {
   return sets.filter((s) => s.set_type !== 'warmup' && s.reps > 0);
 }
 
-/** Best RIR-adjusted e1RM of a session (working sets only). */
+/** Best RIR-adjusted e1RM of a session (working sets only) – used to size weight jumps. */
 export function sessionE1RM(session: ExerciseSession): number {
   return workingSets(session.sets).reduce(
     (best, s) => Math.max(best, estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0)),
     0,
   );
+}
+
+/**
+ * Best plain Epley e1RM of a session (performed reps only). Used for trends,
+ * plateau and PR detection because subjective RIR ratings add noise.
+ */
+export function sessionPerformanceE1RM(session: ExerciseSession): number {
+  return workingSets(session.sets).reduce((best, s) => Math.max(best, estimate1RM(s.weight_kg, s.reps, 0)), 0);
 }
 
 function topSets(session: ExerciseSession): { weight: number; sets: SetPerformance[] } {
@@ -87,8 +95,8 @@ function avg(values: number[]): number | null {
  */
 export function detectPlateau(history: ExerciseSession[]): boolean {
   if (history.length < 4) return false;
-  const recent = history.slice(0, 3).map(sessionE1RM);
-  const before = history.slice(3, 8).map(sessionE1RM);
+  const recent = history.slice(0, 3).map(sessionPerformanceE1RM);
+  const before = history.slice(3, 8).map(sessionPerformanceE1RM);
   const bestBefore = Math.max(...before);
   const bestRecent = Math.max(...recent);
   if (bestBefore <= 0) return false;
@@ -166,8 +174,9 @@ export function suggestProgression(history: ExerciseSession[], cfg: ProgressionC
 
   // ---------- Deload on plateau with declining performance ----------
   if (plateau && valid.length >= 4) {
-    const prev = valid.slice(1, 3).map(sessionE1RM);
-    const declining = prev.every((p) => e1rm < p * 0.995);
+    const prev = valid.slice(1, 3).map(sessionPerformanceE1RM);
+    const lastPerf = sessionPerformanceE1RM(last);
+    const declining = prev.every((p) => lastPerf < p * 0.995);
     if (declining) {
       const deloadWeight = floorToIncrement(weight * 0.9, inc);
       return {

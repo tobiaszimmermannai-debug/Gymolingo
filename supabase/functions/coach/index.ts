@@ -2,7 +2,7 @@
  * KI-Coach edge function.
  *  - action "chat": answers a question using a factual snapshot of the user's data
  *  - action "weekly_report": interprets the deterministic weekly statistics
- * All numbers are computed by @gymolingo/core (bundled in _shared/core.js).
+ * All numbers are computed by @gymolingo/core (bundled in _shared/core.mjs).
  * Without ANTHROPIC_API_KEY the same data is answered by the rule-based coach.
  */
 import {
@@ -14,7 +14,7 @@ import {
   renderWeeklyReportText,
   startOfWeek,
   WEEKLY_REPORT_PROMPT,
-} from '../_shared/core.js';
+} from '../_shared/core.mjs';
 import { anthropicClient, complete, describeError, MODEL } from '../_shared/anthropic.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { loadUserData, userClient } from '../_shared/userData.ts';

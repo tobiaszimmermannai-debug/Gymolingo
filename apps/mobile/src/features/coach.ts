@@ -15,7 +15,7 @@ import {
   todayISO,
   type CoachContext,
 } from '@gymolingo/core';
-import { insert, remove, useDB } from '@/data/store';
+import { insert, update, useDB } from '@/data/store';
 import { useExerciseLookup } from '@/data/hooks';
 import { requestSync } from '@/data/sync';
 import { aiAvailability, aiWeeklyReport, askCoach } from '@/lib/ai';
@@ -65,16 +65,20 @@ export async function sendCoachMessage(text: string, ctx: CoachContext): Promise
   requestSync();
 }
 
-/** Creates (and stores) the weekly report for the given week if missing. */
-export async function ensureWeeklyReport(weekStartDate: string, force = false) {
+export interface ReportView {
+  week_start: string;
+  stats: unknown;
+  content: { title: string; sections: { heading: string; body: string }[] };
+  source: 'ai' | 'rules';
+  model: string | null;
+}
+
+function liveData() {
   const s = useDB.getState();
-  const ws = startOfWeek(weekStartDate);
-  const existing = Object.values(s.tables.ai_reports).find((r) => !r.deleted && r.week_start === ws);
-  if (existing && !force) return existing;
   const profile = s.tables.athlete_profiles[s.userId];
   if (!profile) return null;
   const live = <T extends { deleted: boolean }>(o: Record<string, T>) => Object.values(o).filter((r) => !r.deleted);
-  const data = {
+  return {
     profile,
     sessions: live(s.tables.workout_sessions),
     sets: live(s.tables.workout_sets),
@@ -84,26 +88,38 @@ export async function ensureWeeklyReport(weekStartDate: string, force = false) {
     checkins: live(s.tables.daily_checkins),
     pauses: live(s.tables.streak_pauses),
   };
+}
+
+/**
+ * Returns the weekly report for a week. Rule-based reports are always
+ * recomputed from the current data (so late entries are reflected) and
+ * persisted when something changed; AI reports are kept unless forced.
+ */
+export async function ensureWeeklyReport(weekStartDate: string, force = false): Promise<ReportView | null> {
+  const ws = startOfWeek(weekStartDate);
+  const s = useDB.getState();
+  const existing = Object.values(s.tables.ai_reports).find((r) => !r.deleted && r.week_start === ws);
+  if (existing && existing.source === 'ai' && !force) return existing as unknown as ReportView;
+  const data = liveData();
+  if (!data) return null;
   const stats = buildWeeklyReport(data, ws);
-  let content: { title: string; sections: { heading: string; body: string }[] } = renderWeeklyReportText(stats);
-  let source: 'ai' | 'rules' = 'rules';
-  let model: string | null = null;
-  if (aiAvailability() === 'ok') {
+  let view: ReportView = { week_start: ws, stats, content: renderWeeklyReportText(stats), source: 'rules', model: null };
+  if (aiAvailability() === 'ok' && (force || !existing)) {
     try {
       const r = await aiWeeklyReport(ws, todayISO());
-      if (r.source === 'ai') {
-        content = { title: content.title, sections: r.sections };
-        source = 'ai';
-        model = r.model ?? null;
-      }
+      if (r.source === 'ai') view = { ...view, content: { title: view.content.title, sections: r.sections }, source: 'ai', model: r.model ?? null };
     } catch {
       // keep rule-based report
     }
   }
-  const row = insert('ai_reports', { week_start: ws, stats, content, source, model });
-  if (existing) remove('ai_reports', existing.id);
+  const we = addDays(ws, 6);
+  const inWeek = (d: string) => d >= ws && d <= we;
+  const hasData = data.sessions.some((x) => inWeek(x.date)) || data.meals.some((x) => inWeek(x.date)) || data.weights.some((x) => inWeek(x.date)) || data.steps.some((x) => inWeek(x.date));
+  if (!hasData) return view;
+  if (!existing) insert('ai_reports', view);
+  else if (JSON.stringify(existing.content) !== JSON.stringify(view.content) || existing.source !== view.source) update('ai_reports', existing.id, { stats: view.stats, content: view.content, source: view.source, model: view.model });
   requestSync();
-  return row;
+  return view;
 }
 
 /** Automatic weekly report: on Sunday for the current week, otherwise for the last completed week. */

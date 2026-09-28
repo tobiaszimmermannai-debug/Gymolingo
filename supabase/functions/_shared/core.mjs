@@ -881,6 +881,9 @@ function sessionE1RM(session) {
     0
   );
 }
+function sessionPerformanceE1RM(session) {
+  return workingSets(session.sets).reduce((best, s) => Math.max(best, estimate1RM(s.weight_kg, s.reps, 0)), 0);
+}
 function topSets(session) {
   const ws = workingSets(session.sets);
   const weight = ws.reduce((m, s) => Math.max(m, s.weight_kg), 0);
@@ -891,8 +894,8 @@ function avg(values) {
 }
 function detectPlateau(history) {
   if (history.length < 4) return false;
-  const recent = history.slice(0, 3).map(sessionE1RM);
-  const before = history.slice(3, 8).map(sessionE1RM);
+  const recent = history.slice(0, 3).map(sessionPerformanceE1RM);
+  const before = history.slice(3, 8).map(sessionPerformanceE1RM);
   const bestBefore = Math.max(...before);
   const bestRecent = Math.max(...recent);
   if (bestBefore <= 0) return false;
@@ -957,8 +960,9 @@ function suggestProgression(history, cfg) {
     };
   }
   if (plateau && valid.length >= 4) {
-    const prev2 = valid.slice(1, 3).map(sessionE1RM);
-    const declining = prev2.every((p) => e1rm < p * 0.995);
+    const prev2 = valid.slice(1, 3).map(sessionPerformanceE1RM);
+    const lastPerf = sessionPerformanceE1RM(last);
+    const declining = prev2.every((p) => lastPerf < p * 0.995);
     if (declining) {
       const deloadWeight = floorToIncrement(weight * 0.9, inc);
       return {
@@ -1116,7 +1120,7 @@ function computePersonalRecords(sessions, sets) {
     if (!firstSession.has(s.exercise_id)) firstSession.set(s.exercise_id, s.session_id);
     const isFirstSession = firstSession.get(s.exercise_id) === s.session_id;
     const base = { exercise_id: s.exercise_id, weight_kg: s.weight_kg, reps: s.reps, date: session.date, session_id: s.session_id, set_id: s.id };
-    const e1 = Math.round(estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0) * 10) / 10;
+    const e1 = Math.round(estimate1RM(s.weight_kg, s.reps, 0) * 10) / 10;
     if (s.weight_kg > 0 && (!rec.maxWeight || s.weight_kg > rec.maxWeight.value)) {
       const r = { ...base, type: "weight", value: s.weight_kg };
       if (rec.maxWeight && !isFirstSession) events.push(r);
@@ -1218,9 +1222,7 @@ function e1rmSeries(exerciseId, sessions, sets) {
   const hist = exerciseHistory(exerciseId, sessions, sets);
   return hist.map((h) => ({
     date: h.date,
-    e1rm: Math.round(
-      h.sets.reduce((m, s) => Math.max(m, estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0)), 0) * 10
-    ) / 10,
+    e1rm: Math.round(h.sets.reduce((m, s) => Math.max(m, estimate1RM(s.weight_kg, s.reps, 0)), 0) * 10) / 10,
     topWeight: h.sets.reduce((m, s) => Math.max(m, s.weight_kg), 0)
   })).reverse();
 }
@@ -1231,19 +1233,27 @@ function mostTrainedExercises(sets, limit = 5) {
 }
 function strengthChange(sessions, sets, cur, prev) {
   const sessionDates = new Map(sessions.filter((s) => !s.deleted && s.status === "completed").map((s) => [s.id, s.date]));
-  const best = (from, to) => {
-    const m = /* @__PURE__ */ new Map();
+  const medianOfSessionBests = (from, to) => {
+    const perSession = /* @__PURE__ */ new Map();
     for (const s of sets) {
       if (!isWorkingSet(s)) continue;
       const d = sessionDates.get(s.session_id);
       if (!d || d < from || d > to) continue;
-      const v = estimate1RM(s.weight_kg, s.reps, effectiveRir(s.rir, s.rpe) ?? 0);
-      if (v > (m.get(s.exercise_id) ?? 0)) m.set(s.exercise_id, v);
+      const v = estimate1RM(s.weight_kg, s.reps, 0);
+      const m = perSession.get(s.exercise_id) ?? /* @__PURE__ */ new Map();
+      if (v > (m.get(s.session_id) ?? 0)) m.set(s.session_id, v);
+      perSession.set(s.exercise_id, m);
     }
-    return m;
+    const out = /* @__PURE__ */ new Map();
+    for (const [id, m] of perSession) {
+      const vals = [...m.values()].sort((a2, b2) => a2 - b2);
+      const mid = Math.floor(vals.length / 2);
+      out.set(id, vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2);
+    }
+    return out;
   };
-  const a = best(prev.from, prev.to);
-  const b = best(cur.from, cur.to);
+  const a = medianOfSessionBests(prev.from, prev.to);
+  const b = medianOfSessionBests(cur.from, cur.to);
   const exercises = [];
   for (const [id, p] of a) {
     const c = b.get(id);
@@ -2252,7 +2262,7 @@ function renderWeeklyReportText(s) {
   const st = s.strength;
   sections.push({
     heading: "1. Kraftentwicklung",
-    body: (st.avgE1rmChangePct !== null ? `Gesch\xE4tztes 1RM im Schnitt ${formatSigned(st.avgE1rmChangePct, 1, "%")} gegen\xFCber den 4 Wochen davor.` : "Noch nicht genug Vergleichsdaten f\xFCr einen Krafttrend.") + (st.prs.length ? ` Neue Rekorde: ${st.prs.slice(0, 4).map((p) => `${p.exercise} (${formatNumberDE(p.weight_kg)} kg \xD7 ${p.reps})`).join(", ")}.` : "") + (st.plateaus.length ? ` Stagnation bei: ${st.plateaus.join(", ")}.` : "")
+    body: (st.avgE1rmChangePct !== null ? `Gesch\xE4tztes 1RM im Schnitt ${formatSigned(st.avgE1rmChangePct, 1, "%")} gegen\xFCber den 4 Wochen davor.` : "Noch nicht genug Vergleichsdaten f\xFCr einen Krafttrend.") + (st.prs.length ? ` Neue Rekorde: ${[...new Map(st.prs.map((p) => [p.exercise, p])).values()].slice(0, 4).map((p) => `${p.exercise} (${formatNumberDE(p.weight_kg)} kg \xD7 ${p.reps})`).join(", ")}.` : "") + (st.plateaus.length ? ` Stagnation bei: ${st.plateaus.slice(0, 3).join(", ")}${st.plateaus.length > 3 ? ` und ${st.plateaus.length - 3} weiteren \xDCbungen` : ""}.` : "")
   });
   const c = s.consistency;
   sections.push({
@@ -2722,6 +2732,202 @@ function nutritionTips(profile, meals, today, nowHour = 12) {
   }
   return tips.sort((a, b) => b.priority - a.priority).slice(0, 3);
 }
+
+// src/dev/demo.ts
+function prng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = a + 1831565813 >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+var START_WEIGHTS = {
+  "bench-press": 70,
+  "barbell-row": 60,
+  "overhead-press": 40,
+  "lat-pulldown": 55,
+  "lateral-raise": 8,
+  "triceps-pushdown": 25,
+  "db-curl": 12,
+  squat: 85,
+  "romanian-deadlift": 70,
+  "leg-extension": 45,
+  "lying-leg-curl": 35,
+  "standing-calf-raise": 60,
+  "cable-crunch": 30,
+  "incline-db-press": 24,
+  "seated-cable-row": 55,
+  "db-shoulder-press": 20,
+  "pull-up": 0,
+  "cable-fly": 15,
+  "face-pull": 20,
+  "hammer-curl": 12,
+  "leg-press": 140,
+  "hip-thrust": 80,
+  "bulgarian-split-squat": 14,
+  "seated-leg-curl": 35,
+  "seated-calf-raise": 40,
+  "hanging-leg-raise": 0
+};
+var MEALS = {
+  breakfast: [
+    [["builtin:haferflocken", 70], ["builtin:milch-15", 250], ["builtin:banane", 120]],
+    [["builtin:skyr", 250], ["builtin:beeren-tk", 100], ["builtin:haferflocken", 40]],
+    [["builtin:vollkornbrot", 100], ["builtin:ei", 110], ["builtin:kochschinken", 40]]
+  ],
+  lunch: [
+    [["builtin:reis-gekocht", 250], ["builtin:haehnchenbrust-gegart", 180], ["builtin:brokkoli", 200]],
+    [["builtin:nudeln-gekocht", 300], ["builtin:rinderhack-mager", 150], ["builtin:tomate", 150]],
+    [["builtin:kartoffeln", 300], ["builtin:lachs", 150], ["builtin:gemuesemischung", 200]]
+  ],
+  dinner: [
+    [["builtin:vollkornbrot", 100], ["builtin:huettenkaese", 200], ["builtin:gurke", 150]],
+    [["builtin:wrap", 124], ["builtin:putenbrust", 150], ["builtin:paprika", 150], ["builtin:mozzarella-light", 60]],
+    [["builtin:magerquark", 250], ["builtin:whey", 30], ["builtin:heidelbeeren", 125]]
+  ],
+  snack: [[["builtin:whey", 30], ["builtin:apfel", 150]], [["builtin:proteinriegel", 60]], [["builtin:skyr", 450]], [["builtin:magerquark", 250], ["builtin:mandeln", 20]]]
+};
+function generateDemoData(opts) {
+  const rnd = prng(opts.seed ?? 42);
+  const weeks = opts.weeks ?? 12;
+  const start = addDays(opts.today, -weeks * 7 + 1);
+  const uid = () => {
+    const h = Array.from({ length: 32 }, () => Math.floor(rnd() * 16).toString(16)).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${"89ab"[Math.floor(rnd() * 4)]}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+  };
+  const ts = (date, hour, min = 0) => `${date}T${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000Z`;
+  const base = (date, hour = 8) => ({ id: uid(), user_id: opts.userId, created_at: ts(date, hour), updated_at: ts(date, hour), deleted: false });
+  const pick2 = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const noise = (sd) => (rnd() + rnd() + rnd() - 1.5) * sd * 1.2;
+  const startWeight = 88;
+  const t = calculateTargets({ sex: "male", age: 32, height_cm: 182, weight_kg: startWeight, activity_level: "moderate", training_days_per_week: 4, goal: "fat_loss" });
+  const profile = {
+    ...base(start),
+    id: opts.userId,
+    display_name: "Demo",
+    birth_year: Number(opts.today.slice(0, 4)) - 32,
+    sex: "male",
+    height_cm: 182,
+    start_weight_kg: startWeight,
+    goal_weight_kg: 82,
+    experience_level: "intermediate",
+    training_years: 3,
+    goal: "fat_loss",
+    activity_level: "moderate",
+    schedule_type: "fixed_days",
+    training_days_per_week: 4,
+    training_weekdays: [0, 1, 3, 4],
+    preferred_workout_time: "18:00",
+    equipment: ["barbell", "dumbbell", "machine", "cable", "bodyweight"],
+    diet_type: "omnivore",
+    allergies: [],
+    intolerances: [],
+    targets_mode: "auto",
+    calorie_target: t.calorie_target,
+    protein_target_g: t.protein_target_g,
+    carbs_target_g: t.carbs_target_g,
+    fat_target_g: t.fat_target_g,
+    fiber_target_g: t.fiber_target_g,
+    step_target: 1e4,
+    weekly_rate_kg: t.weekly_rate_kg,
+    weight_tracking_enabled: true,
+    onboarding_completed: true
+  };
+  const tpl = generatePlanTemplate({ daysPerWeek: 4, equipment: profile.equipment, goal: "fat_loss", experience: "intermediate" });
+  const plan = { ...base(start), name: tpl.name, description: tpl.description, is_active: true, sort_order: 0 };
+  const days = [];
+  const pex = [];
+  tpl.days.forEach((d, i) => {
+    const day = { ...base(start), plan_id: plan.id, name: d.name, weekday: profile.training_weekdays[i], sort_order: i };
+    days.push(day);
+    d.exercises.forEach((e, j) => pex.push({ ...base(start), plan_day_id: day.id, exercise_id: e.exercise_id, sort_order: j, target_sets: e.target_sets, rep_min: e.rep_min, rep_max: e.rep_max, target_rir: e.target_rir, rest_seconds: e.rest_seconds, increment_kg: null, notes: null }));
+  });
+  const sessions = [];
+  const sets = [];
+  const history = /* @__PURE__ */ new Map();
+  const meals = [];
+  const weights = [];
+  const steps = [];
+  const checkins = [];
+  const measurements = [];
+  let trueWeight = startWeight;
+  for (const date of dateRange(start, opts.today)) {
+    const wd = weekdayIndex(date);
+    const isToday = date === opts.today;
+    trueWeight += -0.055 + noise(0.02);
+    if (rnd() < 0.85) weights.push({ ...base(date, 7), date, weight_kg: Math.round((trueWeight + noise(0.5)) * 10) / 10, body_fat_pct: wd === 0 ? Math.round((22 - (startWeight - trueWeight) * 0.6 + noise(0.4)) * 10) / 10 : null, source: "manual", note: null });
+    const dayIdx = profile.training_weekdays.indexOf(wd);
+    if (dayIdx >= 0 && !isToday && rnd() < 0.9) {
+      const day = days[dayIdx];
+      const startMin = 17 * 60 + Math.floor(rnd() * 120);
+      const session = {
+        ...base(date, 17),
+        plan_day_id: day.id,
+        name: day.name,
+        date,
+        started_at: ts(date, Math.floor(startMin / 60), startMin % 60),
+        ended_at: ts(date, Math.floor((startMin + 65) / 60), (startMin + 65) % 60),
+        status: "completed",
+        paused_at: null,
+        paused_seconds: 0,
+        notes: null
+      };
+      sessions.push(session);
+      pex.filter((p) => p.plan_day_id === day.id).forEach((p, order) => {
+        const def = EXERCISE_MAP[p.exercise_id];
+        const hist = history.get(p.exercise_id) ?? [];
+        const sugg = suggestProgression(hist, { rep_min: p.rep_min, rep_max: p.rep_max, target_sets: p.target_sets, target_rir: p.target_rir, increment_kg: def.increment_kg, is_bodyweight: def.is_bodyweight });
+        const weight = sugg.kind === "first_time" ? START_WEIGHTS[p.exercise_id] ?? 20 : sugg.weight_kg;
+        const performed = Array.from({ length: p.target_sets }, (_, i) => {
+          const target = sugg.reps[i] ?? p.rep_min + 2;
+          const reps = Math.max(1, Math.min(p.rep_max + 1, target + (rnd() < 0.7 ? 0 : rnd() < 0.6 ? 1 : -1) - (i === p.target_sets - 1 && rnd() < 0.3 ? 1 : 0)));
+          return { weight_kg: weight, reps, rir: Math.max(0, Math.min(4, Math.round(p.target_rir + noise(0.8)))), rpe: null, set_type: "working" };
+        });
+        history.set(p.exercise_id, [{ date, sets: performed }, ...hist]);
+        performed.forEach(
+          (s, i) => sets.push({ ...base(date, 18), session_id: session.id, exercise_id: p.exercise_id, exercise_order: order, set_index: i, set_type: "working", weight_kg: s.weight_kg, reps: s.reps, rir: s.rir, rpe: null, completed: true, completed_at: ts(date, 18), rest_seconds: p.rest_seconds, target_weight_kg: sugg.weight_kg, target_reps: sugg.reps[i] ?? null })
+        );
+      });
+    }
+    if (rnd() < 0.88) {
+      const mealsToday = isToday ? ["breakfast", "lunch"] : ["breakfast", "lunch", "dinner", ...rnd() < 0.7 ? ["snack"] : []];
+      for (const m of mealsToday) {
+        for (const [ref, grams] of pick2(MEALS[m])) {
+          const food = FOOD_MAP[ref];
+          if (!food) continue;
+          const g = Math.round(grams * (0.85 + rnd() * 0.3));
+          const n = nutrientsForAmount(food, g);
+          const hour = m === "breakfast" ? 7 : m === "lunch" ? 12 : m === "dinner" ? 19 : 16;
+          meals.push({ ...base(date, hour), date, meal: m, food_ref: ref, name: food.name, brand: null, amount_g: g, serving_label: null, kcal: n.kcal, protein_g: n.protein_g, carbs_g: n.carbs_g, fat_g: n.fat_g, fiber_g: n.fiber_g, source: "builtin", is_estimate: food.is_estimate, estimate_note: null, logged_at: ts(date, hour) });
+        }
+      }
+    }
+    if (!isToday) {
+      steps.push({ ...base(date, 21), date, steps: Math.round(Math.max(2500, 9e3 + noise(2500) + (wd >= 5 ? 1500 : 0))), source: "manual" });
+      if (rnd() < 0.75) checkins.push({ ...base(date, 21), date, mood: Math.max(1, Math.min(5, Math.round(3.8 + noise(0.8)))), energy: Math.max(1, Math.min(5, Math.round(3.5 + noise(0.9)))), sleep_hours: Math.round((7 + noise(0.8)) * 2) / 2, note: null, day_closed: true, completed_at: ts(date, 21) });
+    }
+    if (wd === 6) {
+      const lost = startWeight - trueWeight;
+      measurements.push({ ...base(date, 9), date, waist_cm: Math.round((94 - lost * 0.9 + noise(0.4)) * 10) / 10, chest_cm: Math.round((106 - lost * 0.3 + noise(0.4)) * 10) / 10, hips_cm: Math.round((102 - lost * 0.4 + noise(0.4)) * 10) / 10, arm_cm: Math.round((37 + noise(0.2)) * 10) / 10, thigh_cm: Math.round((60 - lost * 0.2 + noise(0.3)) * 10) / 10, neck_cm: 40, note: null });
+    }
+  }
+  return {
+    athlete_profiles: [profile],
+    workout_plans: [plan],
+    plan_days: days,
+    plan_exercises: pex,
+    workout_sessions: sessions,
+    workout_sets: sets,
+    meal_entries: meals,
+    weight_entries: weights,
+    step_entries: steps,
+    daily_checkins: checkins,
+    body_measurements: measurements
+  };
+}
 export {
   ACTIVITY_FACTORS,
   ACTIVITY_LABELS_DE,
@@ -2792,6 +2998,7 @@ export {
   formatKg,
   formatNumberDE,
   formatSigned,
+  generateDemoData,
   generatePlanTemplate,
   isBetween,
   isCaloriesOnTarget,
@@ -2835,6 +3042,7 @@ export {
   sessionDurationSec,
   sessionE1RM,
   sessionPRs,
+  sessionPerformanceE1RM,
   setVolume,
   setsPerMuscle,
   shouldApplyRemote,

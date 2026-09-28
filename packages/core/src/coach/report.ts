@@ -378,8 +378,13 @@ export function renderWeeklyReportText(s: WeeklyReportStats): { title: string; s
       (st.avgE1rmChangePct !== null
         ? `Geschätztes 1RM im Schnitt ${formatSigned(st.avgE1rmChangePct, 1, '%')} gegenüber den 4 Wochen davor.`
         : 'Noch nicht genug Vergleichsdaten für einen Krafttrend.') +
-      (st.prs.length ? ` Neue Rekorde: ${st.prs.slice(0, 4).map((p) => `${p.exercise} (${formatNumberDE(p.weight_kg)} kg × ${p.reps})`).join(', ')}.` : '') +
-      (st.plateaus.length ? ` Stagnation bei: ${st.plateaus.join(', ')}.` : ''),
+      (st.prs.length
+        ? ` Neue Rekorde: ${[...new Map(st.prs.map((p) => [p.exercise, p])).values()]
+            .slice(0, 4)
+            .map((p) => `${p.exercise} (${formatNumberDE(p.weight_kg)} kg × ${p.reps})`)
+            .join(', ')}.`
+        : '') +
+      (st.plateaus.length ? ` Stagnation bei: ${st.plateaus.slice(0, 3).join(', ')}${st.plateaus.length > 3 ? ` und ${st.plateaus.length - 3} weiteren Übungen` : ''}.` : ''),
   });
   const c = s.consistency;
   sections.push({
