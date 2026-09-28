@@ -59,7 +59,7 @@ Letzte Aktualisierung: 2026-09-28
 ### 5. Gewicht, Schritte, Body
 - ✅ Schnelle Gewichtseingabe, Tageswert, 7-Tage-Schnitt, 30-Tage-Trend, Körperfett
 - ✅ Körpermaße mit Verlauf
-- 🟩 Fortschrittsbilder (lokal + privater Storage-Bucket) – Upload gegen Supabase noch nicht E2E getestet
+- ✅ Fortschrittsbilder (lokal + privater Storage-Bucket, Cloud-Symbol nach Upload) – E2E: Upload, Anzeige auf Zweitgerät per Signed URL, nicht öffentlich, Löschung mit Konto
 - ✅ Abendlicher Check-in mit Schrittzahl (manuell)
 - 🟩 Apple Health / Health Connect: Abstraktion, Adapter, Einstellungs-Schalter vorbereitet (`src/lib/health`), Aktivierung siehe `docs/HEALTH_INTEGRATION.md` (benötigt Dev-Build, nicht getestet)
 
@@ -93,14 +93,13 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Offline-fähige Erfassung, LWW-Sync-Engine (getestet)
 - ✅ Sync gegen echtes Supabase (lokal): Zwei-Geräte-Sync, Offline-Erfassung + späterer Sync (früher Abbruch, Timeouts, onLine-Check)
 - ✅ Performance mit 2 Jahren Daten (Streaks/XP/Bericht < 35 ms, `useDeferredValue` auf Home)
-- 🟩 Fortschrittsbilder-Upload in privaten Bucket – nicht E2E getestet
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
 - ✅ core: 101 Unit-Tests (Vitest)
 - ✅ DB: 30 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre)
 - ✅ E2E lokal (11): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (4): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync
+- ✅ E2E Backend (5): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync, Fortschrittsbilder
 
 ## Fehlende API-Schlüssel / Konfiguration
 
@@ -124,9 +123,8 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 11/11, E2E Backend 4/4, Typecheck grün.
+- Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 11/11, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. E2E für Fortschrittsbilder-Upload gegen lokales Supabase-Storage.
-2. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
-3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.
+1. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
+2. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

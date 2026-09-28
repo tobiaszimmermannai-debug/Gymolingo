@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { formatDateDE, todayISO, type PhotoPose, type ProgressPhoto } from '@gymolingo/core';
 import { Screen, Row, Section } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
@@ -61,8 +62,8 @@ export default function Photos() {
       </Text>
       <ChipGroup options={POSES} value={pose} onChange={(v) => setPose(v as PhotoPose)} />
       <Row>
-        <Button title="Foto aufnehmen" icon="camera-outline" style={{ flex: 1 }} onPress={() => add(true)} />
-        <Button title="Aus Galerie" icon="images-outline" variant="secondary" style={{ flex: 1 }} onPress={() => add(false)} />
+        <Button title="Foto aufnehmen" icon="camera-outline" style={{ flex: 1 }} onPress={() => add(true)} testID="photo-camera" />
+        <Button title="Aus Galerie" icon="images-outline" variant="secondary" style={{ flex: 1 }} onPress={() => add(false)} testID="photo-gallery" />
       </Row>
       {error && <Text tone="danger">{error}</Text>}
       <Segmented options={[{ value: 'grid', label: 'Übersicht' }, { value: 'compare', label: 'Vergleich' }]} value={mode} onChange={(v) => setMode(v as 'grid' | 'compare')} />
@@ -100,7 +101,12 @@ function PhotoTile({ photo, label }: { photo: ProgressPhoto; label: string }) {
   return (
     <View style={{ flex: 1, gap: 4 }}>
       <View style={{ aspectRatio: 3 / 4, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.surface2 }}>
-        {uri ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
+        {uri ? <Image testID="photo-image" source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
+        {photo.storage_path && (
+          <View testID="photo-uploaded" accessibilityLabel="In deinem privaten Cloud-Speicher gesichert" style={{ position: 'absolute', top: 6, right: 6, backgroundColor: colors.overlay, borderRadius: radius.pill, padding: 3 }}>
+            <Ionicons name="cloud-done-outline" size={14} color={colors.accent} />
+          </View>
+        )}
       </View>
       <Card padding={4} variant="outline">
         <Text variant="small" tone="secondary" align="center">

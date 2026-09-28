@@ -182,3 +182,43 @@ test('offline logging is kept locally and synced when back online', async ({ pag
   await b.getByTestId('tab-nutrition').click();
   await expect(b.getByTestId('meal-dinner')).toContainText('777 kcal');
 });
+
+test('progress photo is uploaded to the private bucket and visible on a second device', async ({ page, browser }) => {
+  const email = `foto-${run}@example.com`;
+  await register(page, 'Fia', email);
+  await page.goto('/');
+  const jpeg = await page.screenshot({ type: 'jpeg', quality: 60, clip: { x: 0, y: 0, width: 120, height: 160 } });
+  await page.goto('/body/photos');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByTestId('photo-gallery').click();
+  await (await chooser).setFiles({ name: 'front.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+  await expect(page.getByTestId('photo-image')).toHaveCount(1);
+  await expect(page.getByTestId('photo-uploaded')).toBeVisible();
+  await syncNow(page);
+
+  // second device: row synced, image loads through a signed URL from private storage
+  const b = await newPage(browser);
+  await b.goto('/auth?mode=signin');
+  await b.getByTestId('auth-email').fill(email);
+  await b.getByTestId('auth-password').fill(pw);
+  await b.getByTestId('auth-submit').click();
+  await expect(b.getByTestId('home-screen')).toBeVisible();
+  await b.goto('/body/photos');
+  const img = b.getByTestId('photo-image').locator('img');
+  await expect(img).toHaveAttribute('src', /\/storage\/v1\/object\/sign\/progress-photos\//);
+  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+
+  // without a session the object is not publicly reachable
+  const path = (await img.getAttribute('src'))!.split('/sign/')[1].split('?')[0];
+  const res = await b.request.get(`http://127.0.0.1:54321/storage/v1/object/public/${path}`);
+  expect(res.ok()).toBe(false);
+
+  // GDPR: deleting the account also removes the stored photo
+  const signed = (await img.getAttribute('src'))!;
+  expect((await b.request.get(signed)).ok()).toBe(true);
+  await b.goto('/settings/account');
+  await b.getByTestId('delete-confirm').fill('LÖSCHEN');
+  await b.getByTestId('delete-account').click();
+  await expect(b.getByTestId('onboarding-start')).toBeVisible();
+  expect((await b.request.get(signed)).ok()).toBe(false);
+});
