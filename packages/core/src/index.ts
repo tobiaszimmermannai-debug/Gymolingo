@@ -19,3 +19,4 @@ export * from './coach/context';
 export * from './coach/offline';
 export * from './sync/engine';
 export * from './training/templates';
+export * from './nutrition/tips';
