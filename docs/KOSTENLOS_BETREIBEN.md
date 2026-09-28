@@ -1,51 +1,77 @@
 # Gymolingo kostenlos betreiben
 
-Ziel: Entwicklung **und** Betrieb ohne laufende Kosten. Alles, was Geld kostet, ist optional und standardmäßig aus.
+Ziel: Entwicklung **und** Betrieb ohne laufende Kosten. Alles, was Geld kosten könnte, ist optional und standardmäßig aus.
 
-## Was ist standardmäßig aktiv – und kostet nichts?
+## Standard (0 €)
 
-| Baustein | Kosten | Hinweis |
+| Baustein | Hinweis |
+|---|---|
+| App im **lokalen Modus** | Alle Daten auf dem Gerät. Training, Ernährung, Körper, Streaks, XP, Progress funktionieren komplett. |
+| **Coach & Wochenbericht** | Regelbasiert auf dem Gerät, rechnet nur mit echten Daten. |
+| **KFA aus Körpermaßen** | Navy-Formel (Hals, Taille, bei Frauen Hüfte) – offline. |
+| **Reminder** | Lokale Benachrichtigungen, kein Push-Server. |
+| **Open Food Facts** | Offene Datenbank (ODbL), Namensnennung in der App. |
+
+## Einrichtung komplett im Browser (ca. 15 Minuten)
+
+### 1. Supabase (Free-Plan) – Konto, Sync, Community
+1. Auf [supabase.com](https://supabase.com) ein **neues Projekt** anlegen (Free, keine Kreditkarte). Region z. B. Frankfurt. **Datenbank-Passwort notieren.**
+2. Werte notieren:
+   - **Project Ref**: steht in der Projekt-URL `https://supabase.com/dashboard/project/<ref>`
+   - **Project URL** und **Publishable/Anon Key**: *Project Settings → API Keys*
+3. **Access Token** erstellen: *Account → Access Tokens → Generate new token*.
+4. *Authentication → URL Configuration*: **Site URL** = `https://<github-user>.github.io/Gymolingo/`
+5. Tipp: *Authentication → Sign In / Providers → Email*: „Confirm email“ ausschalten, solange nur du und Freunde die App nutzen – der Gratis-E-Mail-Versand von Supabase ist stark begrenzt.
+
+### 2. Gemini-Schlüssel (optional, für KI)
+Auf [aistudio.google.com](https://aistudio.google.com) → **Get API key** → Schlüssel erstellen. Siehe Abschnitt „KI & Kosten“ unten.
+
+### 3. GitHub-Repository einstellen
+*Settings → Secrets and variables → Actions*
+
+| Typ | Name | Wert |
 |---|---|---|
-| App im **lokalen Modus** (ohne Server) | 0 € | Alle Daten auf dem Gerät (SQLite / IndexedDB). Training, Ernährung, Körper, Streaks, XP, Progress funktionieren komplett. |
-| **Coach & Wochenbericht** | 0 € | Regelbasiert auf dem Gerät, rechnet nur mit echten Daten (`packages/core`). |
-| **Reminder** | 0 € | Lokale Benachrichtigungen (expo-notifications / Web Notification API) – kein Push-Server nötig. |
-| **Open Food Facts** (Suche, Barcode) | 0 € | Offene Datenbank (ODbL); Namensnennung ist in der App enthalten. |
-| Deutsche Basis-Lebensmittel, Übungen | 0 € | Im App-Code enthalten. |
+| Secret | `SUPABASE_ACCESS_TOKEN` | Access Token aus Schritt 1.3 |
+| Secret | `SUPABASE_DB_PASSWORD` | DB-Passwort aus Schritt 1.1 |
+| Secret | `GEMINI_API_KEY` | optional, aus Schritt 2 |
+| Variable | `SUPABASE_PROJECT_REF` | Project Ref |
+| Variable | `SUPABASE_URL` | Project URL |
+| Variable | `SUPABASE_ANON_KEY` | Publishable/Anon Key (öffentlich, durch RLS geschützt) |
+| Variable | `AI_ENABLED` | `true`, wenn KI genutzt werden soll |
+| Variable | `AI_DAILY_LIMIT` | optional, KI-Anfragen pro Nutzer/Tag (Standard 30) |
 
-## Optional und trotzdem kostenlos
+### 4. GitHub Pages einschalten
+*Settings → Pages → Source: **GitHub Actions***.
 
-### Konto, Sync & Community – Supabase Free-Plan
-- Kostenloses Projekt auf supabase.com anlegen (keine Kreditkarte nötig).
-- `npx supabase link --project-ref <ref>` → `npx supabase db push`
-- In `apps/mobile/.env`: `EXPO_PUBLIC_SUPABASE_URL` und `EXPO_PUBLIC_SUPABASE_ANON_KEY` eintragen.
-- Grenzen des Free-Plans (Stand Entwicklung, bitte auf supabase.com prüfen): begrenzte DB-/Storage-Größe; inaktive Projekte werden nach einiger Zeit **pausiert** (per Klick im Dashboard wieder aktivierbar, Daten bleiben erhalten). Die App arbeitet währenddessen lokal weiter und synchronisiert später.
-- Keine Kosten entstehen automatisch: Free-Projekte haben kein Überschreitungs-Billing ohne Upgrade.
+### 5. Ausrollen
+*Actions* → **Deploy backend (Supabase)** → *Run workflow*, danach **Deploy PWA (GitHub Pages)** → *Run workflow*.
+Die App liegt dann unter `https://<github-user>.github.io/Gymolingo/`. Künftige Änderungen am Haupt-Branch werden automatisch ausgerollt.
 
-### Web-App / PWA hosten
-```bash
-npm run build:web     # → apps/mobile/dist
-```
-Die Web-Version ist eine **PWA**: installierbar („Zum Home-Bildschirm“) und startet nach dem ersten Besuch auch offline (Service Worker `public/sw.js`). Den Ordner `dist` z. B. auf **GitHub Pages**, **Cloudflare Pages** oder **Netlify** (jeweils Gratis-Stufe) hochladen. Wichtig: SPA-Fallback auf `index.html` einrichten (Cloudflare/Netlify: `_redirects` mit `/* /index.html 200`; GitHub Pages: `404.html` = Kopie von `index.html`).
+## PWA installieren
+Seite im Handy-Browser öffnen → **„Zum Home-Bildschirm“** (iPhone: Teilen-Symbol; Android: Menü ⋮). Die App startet danach wie eine normale App, im Vollbild und nach dem ersten Besuch auch offline.
 
-### Auf dem eigenen Handy nutzen
-- **Expo Go** (kostenlos): `cd apps/mobile && npx expo start` → QR-Code scannen.
-- **Android-APK** lokal bauen: `npx expo run:android --variant release` (Android Studio, kostenlos) oder EAS Build im Gratis-Kontingent.
-- **iOS** auf dem eigenen Gerät: `npx expo run:ios --device` mit kostenlosem Apple-Account (Signatur 7 Tage gültig).
+## KI & Kosten (Google Gemini)
+- Die KI läuft **nur serverseitig** (Supabase Edge Functions). Der Schlüssel liegt als Secret auf Supabase, nie in der App.
+- Modell: `gemini-flash-latest` (änderbar per Secret `GEMINI_MODEL`).
+- Jeder Nutzer hat ein **Tageslimit** (`AI_DAILY_LIMIT`, Standard 30). Ist es erreicht oder das Gemini-Kontingent erschöpft, antwortet der kostenlose Regel-Coach.
+- **Wichtig (Nutzungsbedingungen von Google, Stand Recherche 09/2026):** Die kostenlose Stufe darfst du für dich selbst nutzen. Wenn du die App **anderen Nutzern im EWR, der Schweiz oder UK** bereitstellst, verlangen die Gemini-Bedingungen einen Cloud-Projekt-**Abrechnungskonto** („Paid Services“). Dann fallen pro Anfrage kleine Kosten an → in der Google Cloud ein **Budget mit Benachrichtigung** setzen und `AI_DAILY_LIMIT` niedrig halten. Bitte vor der Veröffentlichung die aktuellen Bedingungen auf ai.google.dev prüfen.
+- Fotos (Mahlzeit, KFA) werden verkleinert (max. 1024 px) übertragen; für Körperfotos fragt die App vorher um Einwilligung.
 
-## Was würde Geld kosten? (alles aus)
+## Auf dem eigenen Handy ohne Store
+- **PWA** (siehe oben) – kostenlos, iPhone und Android.
+- **Expo Go**: `cd apps/mobile && npx expo start` → QR-Code scannen.
+- **Android-APK** lokal: `npx expo run:android --variant release` (Android Studio, kostenlos).
+
+## Was würde Geld kosten?
 
 | Baustein | Kosten | Status |
 |---|---|---|
-| KI-Coach / KI-Wochenbericht / Foto-Erkennung (Anthropic API) | nutzungsbasiert pro Anfrage | **aus** (`EXPO_PUBLIC_AI_ENABLED=false`, kein API-Key hinterlegt) |
+| Gemini API für andere Nutzer (EWR/CH/UK) | nutzungsbasiert, sehr gering bei Flash-Modellen | aus, bis `AI_ENABLED=true` + Schlüssel |
+| Google Play Store | einmalig 25 US-$ | nur für Store-Veröffentlichung |
+| Apple App Store | 99 US-$ pro Jahr | nur für Store-Veröffentlichung |
 | Supabase Pro | monatlich | nicht nötig |
-| Apple App Store | Jahresgebühr Apple Developer Program | nur für Veröffentlichung im Store |
-| Google Play Store | einmalige Registrierungsgebühr | nur für Veröffentlichung im Store |
-| Eigene Domain | jährlich | optional, Subdomain der Hoster reicht |
-
-Ohne `ANTHROPIC_API_KEY` beantworten die Edge Functions automatisch regelbasiert – selbst wenn jemand `EXPO_PUBLIC_AI_ENABLED=true` setzt, entstehen ohne Schlüssel keine KI-Kosten.
 
 ## Checkliste „0 €"
-- [ ] `apps/mobile/.env` enthält **kein** `EXPO_PUBLIC_AI_ENABLED=true`
-- [ ] Kein `ANTHROPIC_API_KEY` als Supabase-Secret gesetzt
-- [ ] Supabase (falls genutzt) im Free-Plan, keine Kreditkarte hinterlegt
-- [ ] Hosting im Gratis-Tarif (oder nur lokal / Expo Go)
+- [ ] `AI_ENABLED` nicht gesetzt oder kein `GEMINI_API_KEY` → Regel-Coach
+- [ ] Supabase im Free-Plan, keine Kreditkarte hinterlegt
+- [ ] Hosting über GitHub Pages (öffentliches Repository)
