@@ -66,11 +66,18 @@ export function mergeRemoteRows(local: LocalAdapter, table: string, rows: SyncRo
 const PUSH_BATCH = 200;
 const PULL_LIMIT = 500;
 
+/**
+ * @param overlapMs the first pull of each table starts slightly before the stored
+ * cursor. Concurrent transactions can commit rows with a server timestamp older
+ * than rows already seen; re-reading a small window catches them (merging is
+ * idempotent thanks to LWW).
+ */
 export async function syncAll(
   tables: string[],
   local: LocalAdapter,
   remote: RemoteAdapter,
   now: () => Date = () => new Date(),
+  overlapMs = 30_000,
 ): Promise<SyncReport> {
   const report: SyncReport = { pushed: {}, pulled: {}, errors: [], startedAt: now().toISOString(), finishedAt: '' };
 
@@ -95,7 +102,8 @@ export async function syncAll(
   // 2) pull
   for (const table of tables) {
     try {
-      let cursor = local.getCursor(table);
+      const stored = local.getCursor(table);
+      let cursor = stored ? new Date(new Date(stored).getTime() - overlapMs).toISOString() : null;
       for (;;) {
         const rows = await remote.pull(table, cursor, PULL_LIMIT);
         if (!rows.length) break;
@@ -104,7 +112,7 @@ export async function syncAll(
         const last = rows[rows.length - 1].server_updated_at;
         if (last) {
           cursor = last;
-          local.setCursor(table, last);
+          if (!stored || last > stored) local.setCursor(table, last);
         }
         if (rows.length < PULL_LIMIT || !last) break;
       }
