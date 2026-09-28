@@ -1,0 +1,41 @@
+# Deploys database schema (RLS, community, AI quota) and edge functions to a
+# FREE Supabase project. Runs only after the project is configured:
+#   Secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, (optional) GEMINI_API_KEY
+#   Variables: SUPABASE_PROJECT_REF, (optional) AI_DAILY_LIMIT
+name: Deploy backend (Supabase)
+on:
+  push:
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+concurrency:
+  group: supabase
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: vars.SUPABASE_PROJECT_REF != '' && (github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx supabase link --project-ref "${{ vars.SUPABASE_PROJECT_REF }}"
+      - run: npx supabase db push
+      - run: npx supabase functions deploy coach meal-photo body-fat
+      - name: AI secrets (only if a Gemini key is configured)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '30' }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            npx supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY" AI_DAILY_LIMIT="$AI_DAILY_LIMIT"
+          else
+            echo "::notice::Kein GEMINI_API_KEY gesetzt – Coach läuft regelbasiert (kostenlos)."
+          fi

@@ -3,7 +3,9 @@
  * - hashed bundles/assets: cache first (file names change on every build)
  * - other origins (Supabase, Open Food Facts) are never cached */
 const CACHE = 'gymolingo-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/pwa-192.png'];
+// "/" normally, "/Gymolingo/" when hosted in a sub-folder (GitHub Pages)
+const BASE = new URL(self.registration.scope).pathname;
+const SHELL = [BASE, `${BASE}manifest.webmanifest`, `${BASE}icons/pwa-192.png`];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -28,15 +30,15 @@ self.addEventListener('fetch', (e) => {
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          if (res.ok) caches.open(CACHE).then((c) => c.put('/', copy));
+          if (res.ok) caches.open(CACHE).then((c) => c.put(BASE, copy));
           return res;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match(BASE)),
     );
     return;
   }
 
-  if (url.pathname.startsWith('/_expo/') || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
+  if (['_expo/', 'assets/', 'icons/'].some((p) => url.pathname.startsWith(BASE + p))) {
     e.respondWith(
       caches.match(req).then(
         (hit) =>
