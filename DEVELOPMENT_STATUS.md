@@ -82,7 +82,7 @@ Letzte Aktualisierung: 2026-09-28
 ### 9. KI-Coach
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
-- ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung
+- ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
 - 🟩 Edge Functions `coach` (Chat + Wochenbericht, JSON-Schema, Fallback auf Regeln) und `meal-photo` – lokal mit Deno getestet (ohne Key → Regeln / 501)
 
 ### 10. Progress-Dashboard
@@ -126,5 +126,5 @@ Letzte Aktualisierung: 2026-09-28
 - Stand „Docs: kostenlos betreiben, Health-Integration, Status": core 101/101, DB 30/30, E2E lokal 11/11, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. Weitere visuelle QA mit Demo-Daten (Tablet-Breite, sehr lange Namen, leere Zustände).
+1. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 2. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

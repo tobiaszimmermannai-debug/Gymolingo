@@ -31,3 +31,45 @@ test('screens with demo data', async ({ page }) => {
   await page.waitForTimeout(1000);
   await page.screenshot({ path: `${out}/workout.png`, fullPage: true });
 });
+
+test('empty states with a long name', async ({ page }) => {
+  const out = process.env.SHOT_DIR ?? '/tmp/claude-0/shots';
+  await completeOnboarding(page, { name: 'Maximiliane-Alexandra von Hohenzollern' });
+  for (const [path, name] of [
+    ['/', 'e-home'],
+    ['/training', 'e-training'],
+    ['/nutrition', 'e-nutrition'],
+    ['/progress', 'e-progress'],
+    ['/body/weight', 'e-weight'],
+    ['/body/measurements', 'e-measurements'],
+    ['/body/photos', 'e-photos'],
+    ['/coach', 'e-coach'],
+    ['/coach/report', 'e-report'],
+    ['/community', 'e-community'],
+    ['/workout/history', 'e-history'],
+    ['/nutrition/recipes', 'e-recipes'],
+  ] as const) {
+    await page.goto(path);
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: `${out}/${name}.png`, fullPage: true });
+  }
+});
+
+test('tablet width with demo data', async ({ page }) => {
+  const out = process.env.SHOT_DIR ?? '/tmp/claude-0/shots';
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  await completeOnboarding(page);
+  page.on('dialog', (d) => d.accept());
+  await page.goto('/settings');
+  await page.getByTestId('load-demo').click();
+  await page.waitForTimeout(1500);
+  for (const [path, name] of [
+    ['/', 't-home'],
+    ['/progress', 't-progress'],
+    ['/nutrition', 't-nutrition'],
+  ] as const) {
+    await page.goto(path);
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${out}/${name}.png`, fullPage: false });
+  }
+});

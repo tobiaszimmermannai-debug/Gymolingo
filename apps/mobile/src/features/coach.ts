@@ -9,6 +9,7 @@ import {
   answerOffline,
   buildCoachContext,
   buildWeeklyReport,
+  firstDataDate,
   formatKg,
   renderWeeklyReportText,
   startOfWeek,
@@ -71,6 +72,8 @@ export interface ReportView {
   content: { title: string; sections: { heading: string; body: string }[] };
   source: 'ai' | 'rules';
   model: string | null;
+  /** true when the week has no logged data at all (nothing to report) */
+  empty?: boolean;
 }
 
 function liveData() {
@@ -115,11 +118,22 @@ export async function ensureWeeklyReport(weekStartDate: string, force = false): 
   const we = addDays(ws, 6);
   const inWeek = (d: string) => d >= ws && d <= we;
   const hasData = data.sessions.some((x) => inWeek(x.date)) || data.meals.some((x) => inWeek(x.date)) || data.weights.some((x) => inWeek(x.date)) || data.steps.some((x) => inWeek(x.date));
-  if (!hasData) return view;
+  if (!hasData) return { ...view, empty: true };
   if (!existing) insert('ai_reports', view);
   else if (JSON.stringify(existing.content) !== JSON.stringify(view.content) || existing.source !== view.source) update('ai_reports', existing.id, { stats: view.stats, content: view.content, source: view.source, model: view.model });
   requestSync();
   return view;
+}
+
+/** Week the report screen opens with: like autoReportWeek, but never a week before the user started. */
+export function defaultReportWeek(today = todayISO()): string {
+  const ws = autoReportWeek(today);
+  const data = liveData();
+  if (!data) return ws;
+  const created = data.profile.created_at?.slice(0, 10) ?? today;
+  const first = firstDataDate(data);
+  const since = first && first < created ? first : created;
+  return addDays(ws, 6) < since ? startOfWeek(today) : ws;
 }
 
 /** Automatic weekly report: on Sunday for the current week, otherwise for the last completed week. */

@@ -28,7 +28,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         bottom: 0,
         paddingBottom: Math.max(insets.bottom, 10),
         paddingTop: 8,
-        backgroundColor: 'rgba(11,12,14,0.96)',
+        backgroundColor: 'rgba(11,12,14,0.985)',
         borderTopWidth: 1,
         borderTopColor: colors.border,
         alignItems: 'center',

@@ -24,4 +24,8 @@ test('offline coach answers from real data and weekly report is generated automa
   await expect(page.getByTestId('report-screen')).toBeVisible();
   await expect(page.getByTestId('report-section')).toHaveCount(7);
   await expect(page.getByTestId('report-section').first()).toContainText('Kraftentwicklung');
+  // weeks before the start show an empty state instead of a report full of zeros
+  await page.getByLabel('Vorherige Woche').click();
+  await expect(page.getByTestId('report-empty')).toBeVisible();
+  await expect(page.getByTestId('report-section')).toHaveCount(0);
 });

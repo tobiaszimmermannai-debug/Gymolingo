@@ -8,10 +8,10 @@ import { Card } from '@/ui/Card';
 import { Button, IconButton } from '@/ui/Button';
 import { Badge } from '@/ui/Chip';
 import { spacing } from '@/ui/theme';
-import { autoReportWeek, ensureWeeklyReport, type ReportView } from '@/features/coach';
+import { defaultReportWeek, ensureWeeklyReport, type ReportView } from '@/features/coach';
 
 export default function WeeklyReport() {
-  const [week, setWeek] = useState(autoReportWeek());
+  const [week, setWeek] = useState(() => defaultReportWeek());
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ReportView | null>(null);
   const current = startOfWeek(todayISO());
@@ -43,7 +43,15 @@ export default function WeeklyReport() {
         </Text>
       )}
       {busy && !report && <Text tone="secondary">Bericht wird erstellt …</Text>}
-      {report && content?.sections && (
+      {report?.empty && (
+        <Card padding={spacing.lg} testID="report-empty">
+          <Text variant="h3">Noch nichts zu berichten</Text>
+          <Text tone="secondary" style={{ marginTop: 6 }}>
+            In dieser Woche wurden keine Trainings, Mahlzeiten, Gewichte oder Schritte eingetragen. Sobald du etwas erfasst, entsteht der Bericht automatisch – jeden Sonntag für die ganze Woche.
+          </Text>
+        </Card>
+      )}
+      {report && !report.empty && content?.sections && (
         <>
           <Row gap={spacing.sm}>
             <Badge label={report.source === 'ai' ? 'KI-Interpretation' : 'Berechnet aus deinen Daten'} tone={report.source === 'ai' ? 'accent' : 'muted'} />
