@@ -96,17 +96,23 @@ test('friends: request, accept, leaderboard and privacy settings are enforced', 
   await b.getByTestId('community-tab-friends').click();
   await b.getByTestId('friend-search').fill(`ada_${run}`);
   await b.getByTestId(`add-friend-ada_${run}`).click();
+  // Bob sets a fun status → saved on the server, the screen closes
+  await b.goto('/status');
+  await b.getByTestId('status-preset-🥤').click();
+  await expect(b.getByTestId('status-screen')).toHaveCount(0);
 
   // Ada accepts
   await a.goto('/community');
   await a.getByTestId('community-tab-friends').click();
   await a.getByTestId(`accept-bob_${run}`).click();
   await expect(a.getByTestId(`friend-bob_${run}`)).toBeVisible();
+  await expect(a.getByTestId(`friend-status-bob_${run}`)).toHaveText('🥤 Monster Zero White intus – Pump incoming');
 
   // coach briefing on Home shows when the tester was last online
   await a.getByTestId('tab-index').click();
   await expect(a.getByTestId('briefing-friends')).toContainText('Bob');
   await expect(a.getByTestId('briefing-friends')).toContainText('gerade online');
+  await expect(a.getByTestId('briefing-friend-status')).toContainText('🥤 Monster Zero White intus');
 
   // one Gemini key for the group: Ada stores and shares it, Bob gets AI without entering anything
   await a.goto('/settings/ai');
@@ -122,6 +128,10 @@ test('friends: request, accept, leaderboard and privacy settings are enforced', 
   await b.getByTestId('coach-send').click();
   await expect(b.getByTestId('coach-msg-assistant').last()).toContainText('KI-Antwort');
   expect(bobGoogle.calls.at(-1)!.key).toBe('AIzaSyGroupKey00000000000000000grp1');
+  // clean up: the shared key is global, later runs need a free slot
+  await a.goto('/settings/ai');
+  await a.getByTestId('ai-share-stop').click();
+  await expect(a.getByTestId('ai-share')).toBeVisible();
 
   await a.goto('/community');
 

@@ -35,6 +35,7 @@ import { uploadPendingPhotos } from './photoSync';
 import { registerServiceWorker } from '@/lib/pwa';
 import { refreshAiKeyStatus, refreshSharedKey } from '@/lib/ai';
 import { refreshFriendsActivity, touchLastSeen } from './presence';
+import { syncStatus } from './status';
 
 export function AppBootstrap() {
   const onboarded = useDB((s) => !!s.tables.athlete_profiles[s.userId]?.onboarding_completed);
@@ -57,6 +58,7 @@ function useAutoSync() {
       void touchLastSeen();
       void refreshFriendsActivity();
       void refreshSharedKey();
+      void syncStatus();
     };
     run();
     void refreshAiKeyStatus();

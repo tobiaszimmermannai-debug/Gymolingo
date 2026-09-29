@@ -11,9 +11,9 @@ if (!URL || !KEY) {
 }
 const h = { apikey: KEY };
 /** exists when anon gets "permission denied" (42501) instead of "not found" */
-async function exists(kind, name) {
+async function exists(kind, name, args = {}) {
   try {
-    const r = kind === 'table' ? await fetch(`${URL}/rest/v1/${name}?limit=0`, { headers: h }) : await fetch(`${URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: { ...h, 'content-type': 'application/json' }, body: '{}' });
+    const r = kind === 'table' ? await fetch(`${URL}/rest/v1/${name}?limit=0`, { headers: h }) : await fetch(`${URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify(args) });
     const body = await r.json().catch(() => ({}));
     if (r.ok || body.code === '42501') return true;
     if (['PGRST205', 'PGRST202', '42P01', '42883'].includes(body.code)) return false;
@@ -28,10 +28,11 @@ const checks = [
   ['Zuletzt online', 'rpc', 'friends_activity', 'setup.sql'],
   ['Lauf & EMS', 'table', 'cardio_sessions', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
   ['Gemeinsamer KI-Schlüssel', 'rpc', 'get_shared_ai_key', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
+  ['Status-Meldungen', 'rpc', 'set_status', 'Update-SQL (supabase/updates/2026-09-30-status.sql)', { p_emoji: null, p_text: null }],
 ];
 let missing = 0;
 const results = [];
-for (const [label, kind, name, fix] of checks) results.push([label, await exists(kind, name), fix]);
+for (const [label, kind, name, fix, args] of checks) results.push([label, await exists(kind, name, args), fix]);
 // empty database → only the complete setup.sql applies (the update needs the base schema)
 const baseMissing = results[0][1] === false;
 for (const [label, ok, fix] of results) {

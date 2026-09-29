@@ -14,6 +14,7 @@ import { useDB, setPrefs } from '@/data/store';
 import { isBackendConfigured } from '@/lib/supabase';
 import { community, METRIC_LABELS, type ChallengeRow, type FriendRow, type LeaderRow, type PublicProfile, type SearchRow } from '@/features/community';
 import { confirm, notify } from '@/lib/dialog';
+import { refreshFriendsActivity } from '@/features/presence';
 
 type Tab = 'leaderboard' | 'friends' | 'challenges';
 const AVATARS = ['💪', '🏋️', '🔥', '⚡', '🦾', '🏃', '🧘', '🚴', '🥇', '🐺', '🦁', '🐻'];
@@ -243,6 +244,7 @@ function Friends() {
     try {
       const f = await community.friends();
       setFriends(f);
+      void refreshFriendsActivity(true);
       setPrefs({ friendsCount: f.filter((x) => x.status === 'accepted').length });
       setErr(null);
     } catch (e) {
@@ -263,6 +265,8 @@ function Friends() {
   const incoming = (friends ?? []).filter((f) => f.status === 'pending' && f.direction === 'incoming');
   const outgoing = (friends ?? []).filter((f) => f.status === 'pending' && f.direction === 'outgoing');
   const accepted = (friends ?? []).filter((f) => f.status === 'accepted');
+  const activity = useDB((s) => s.prefs.friendsActivity?.rows);
+  const statusOf: Record<string, string> = Object.fromEntries((activity ?? []).filter((a) => a.status_emoji).map((a) => [a.user_id, `${a.status_emoji} ${a.status_text ?? ''}`.trim()]));
 
   return (
     <>
@@ -336,6 +340,11 @@ function Friends() {
                 <Text variant="small" tone="muted">
                   @{f.username}
                 </Text>
+                {statusOf[f.user_id] && (
+                  <Text variant="small" numberOfLines={2} style={{ marginTop: 2 }} testID={`friend-status-${f.username}`}>
+                    {statusOf[f.user_id]}
+                  </Text>
+                )}
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Row>

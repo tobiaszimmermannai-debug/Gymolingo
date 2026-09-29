@@ -13,6 +13,16 @@ import { SINGLETON_TABLES, TABLES, type TableName, type TableTypes } from './tab
 export type Tables = { [K in TableName]: Record<string, TableTypes[K]> };
 type DirtyMap = { [K in TableName]?: Record<string, string> };
 
+export interface FriendActivity {
+  user_id: string;
+  username: string | null;
+  display_name: string;
+  avatar_emoji: string;
+  last_seen_at: string | null;
+  status_emoji?: string | null;
+  status_text?: string | null;
+}
+
 export interface DBState {
   hydrated: boolean;
   userId: string;
@@ -46,8 +56,10 @@ export interface DBState {
     /** on-device AI limits: requests today, models blocked after a quota answer (ISO until) */
     aiUsage?: { day: string; count: number };
     aiBlocks?: Record<string, string>;
-    /** friends' "zuletzt online" for the coach briefing */
-    friendsActivity?: { fetchedAt: string; rows: { user_id: string; username: string | null; display_name: string; avatar_emoji: string; last_seen_at: string | null }[] };
+    /** friends' "zuletzt online" and fun status for the coach briefing */
+    friendsActivity?: { fetchedAt: string; rows: FriendActivity[] };
+    /** own fun status ("🥤 Monster Zero White intus"); pending = not yet on the server */
+    status?: { emoji: string; text: string; until: string | null; pending?: boolean } | null;
   };
 }
 

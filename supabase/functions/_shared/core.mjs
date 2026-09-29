@@ -3424,6 +3424,78 @@ async function aiBodyFat(r, images, facts) {
   if (res.blocked || !res.text) return null;
   return sanitizeBodyFat(JSON.parse(res.text), res.model);
 }
+
+// src/social/status.ts
+var STATUS_MAX_TEXT = 60;
+var STATUS_GROUPS = [
+  {
+    title: "Treibstoff",
+    items: [
+      { emoji: "\u{1F964}", text: "Monster Zero White intus \u2013 Pump incoming" },
+      { emoji: "\u2615", text: "Pre-Workout: 3 Espresso, 0 Schlaf" },
+      { emoji: "\u{1F9C3}", text: "Kreatin geladen \u2013 5 g, wie jeden Tag" },
+      { emoji: "\u{1F95B}", text: "Shaker leer, Proteinspeicher voll" },
+      { emoji: "\u{1F35A}", text: "Meal Prep: 14 Dosen Reis mit H\xE4hnchen" },
+      { emoji: "\u{1F355}", text: "Cheat Day \u2013 Makros? Nie geh\xF6rt" }
+    ]
+  },
+  {
+    title: "Gym",
+    items: [
+      { emoji: "\u{1F9B5}", text: "Leg Day \u2013 Treppen sind heute der Endgegner" },
+      { emoji: "\u{1F4AA}", text: "Pump so krass, T-Shirt zu klein" },
+      { emoji: "\u{1F4C8}", text: "PR-Jagd \u2013 heute f\xE4llt ein Rekord" },
+      { emoji: "\u{1F98D}", text: "Gorilla-Modus aktiviert" },
+      { emoji: "\u{1F3CB}\uFE0F", text: "Nur noch ein Satz \u2026 sagte ich vor 5 S\xE4tzen" },
+      { emoji: "\u{1FA9E}", text: "Spiegel-Check zwischen den S\xE4tzen" },
+      { emoji: "\u26A1", text: "EMS gegrillt \u2013 Muskeln brutzeln noch" },
+      { emoji: "\u{1F3C3}", text: "Cardio? Ich dachte, das ist ein Tippfehler" }
+    ]
+  },
+  {
+    title: "Danach",
+    items: [
+      { emoji: "\u{1F635}\u200D\u{1F4AB}", text: "Muskelkater \u2013 Hinsetzen dauert 3 Minuten" },
+      { emoji: "\u{1F634}", text: "Rest Day \u2013 Gains wachsen im Schlaf" },
+      { emoji: "\u{1F6CB}\uFE0F", text: "Aktive Regeneration (Couch)" },
+      { emoji: "\u{1F9CA}", text: "Eisbad \xFCberlebt \u2013 knapp" }
+    ]
+  },
+  {
+    title: "Tech-Modus",
+    items: [
+      { emoji: "\u{1F4BE}", text: "Gains gespeichert \u2013 Autosave an" },
+      { emoji: "\u{1F50B}", text: "Akku 3 % \u2013 Lade Kohlenhydrate" },
+      { emoji: "\u{1F41B}", text: "Bug im Knie \u2013 Patch folgt" },
+      { emoji: "\u{1F4CA}", text: "Makros im Tabellenblatt optimiert" },
+      { emoji: "\u{1F504}", text: "Bulk v2.0 wird installiert \u2026" },
+      { emoji: "\u2702\uFE0F", text: "Cut l\xE4uft \u2013 bitte nicht mit Essen st\xF6ren" },
+      { emoji: "\u{1F680}", text: "Deploy nach Gym: erfolgreich" },
+      { emoji: "\u{1F916}", text: "Der Coach sagt: noch ein Satz" }
+    ]
+  }
+];
+var STATUS_PRESETS = STATUS_GROUPS.flatMap((g) => g.items);
+var STATUS_EMOJIS = ["\u{1F964}", "\u{1F4AA}", "\u{1F9B5}", "\u{1F525}", "\u26A1", "\u{1F634}", "\u{1F635}\u200D\u{1F4AB}", "\u{1F3C3}", "\u{1F6B4}", "\u{1F3CA}", "\u{1F9D8}", "\u{1F35A}", "\u{1F355}", "\u{1F95B}", "\u2615", "\u{1F4C8}", "\u{1F98D}", "\u{1F43B}", "\u{1F916}", "\u{1F680}", "\u{1F3A7}", "\u{1F9CA}", "\u{1F915}", "\u{1F389}"];
+var STATUS_DURATION_LABELS = {
+  today: "Heute",
+  "3days": "3 Tage",
+  forever: "Bis ich es \xE4ndere"
+};
+function statusUntil(duration, now = /* @__PURE__ */ new Date()) {
+  if (duration === "forever") return null;
+  const end = new Date(now);
+  end.setHours(24, 0, 0, 0);
+  if (duration === "3days") end.setDate(end.getDate() + 2);
+  return end.toISOString();
+}
+function isStatusActive(status, now = /* @__PURE__ */ new Date()) {
+  if (!status?.emoji) return false;
+  return !status.until || new Date(status.until).getTime() > now.getTime();
+}
+function cleanStatusText(text) {
+  return Array.from(text.replace(/\s+/g, " ").trim()).slice(0, STATUS_MAX_TEXT).join("");
+}
 export {
   ACTIVITY_FACTORS,
   ACTIVITY_LABELS_DE,
@@ -3461,6 +3533,11 @@ export {
   OFF_USER_AGENT,
   PERIOD_DAYS,
   REPORT_SCHEMA,
+  STATUS_DURATION_LABELS,
+  STATUS_EMOJIS,
+  STATUS_GROUPS,
+  STATUS_MAX_TEXT,
+  STATUS_PRESETS,
   STREAK_LABELS_DE,
   STREAK_MILESTONES,
   WEEKDAY_LONG_DE,
@@ -3489,6 +3566,7 @@ export {
   cardioKcal,
   cardioMet,
   cardioSummary,
+  cleanStatusText,
   completedSessions,
   computeAllStreaks,
   computeDailyStreak,
@@ -3534,6 +3612,7 @@ export {
   isPlannedTrainingDay,
   isProteinHit,
   isQuiet,
+  isStatusActive,
   isValidBarcode,
   isWorkingSet,
   isoWeekNumber,
@@ -3587,6 +3666,7 @@ export {
   speedKmh,
   startOfMonth,
   startOfWeek,
+  statusUntil,
   stepsByDate,
   strengthChange,
   stripLocalFields,

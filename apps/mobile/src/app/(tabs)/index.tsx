@@ -16,6 +16,7 @@ import { useExerciseLookup, useRows } from '@/data/hooks';
 import { BADGE_MAP } from '@gymolingo/core';
 import { SyncBadge } from '@/features/SyncBadge';
 import { DailyBriefing } from '@/features/DailyBriefing';
+import { useMyStatus } from '@/features/status';
 
 const STREAK_ICONS: Record<StreakKind, string> = { training: '🏋️', nutrition: '📒', protein: '🥩', steps: '👟', checkin: '🌙', weight: '⚖️' };
 
@@ -30,6 +31,7 @@ export default function Home() {
   const unseen = useRows('user_achievements').filter((a) => !a.seen && BADGE_MAP[a.badge_id]);
   const hour = new Date().getHours();
   const greeting = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
+  const status = useMyStatus();
 
   return (
     <Screen tabBarPadding testID="home-screen">
@@ -50,6 +52,18 @@ export default function Home() {
         </Pressable>
         <IconButton icon="settings-outline" accessibilityLabel="Einstellungen" testID="open-settings" onPress={() => router.push('/settings')} />
       </Row>
+      <Pressable
+        testID="home-status"
+        onPress={() => router.push('/status')}
+        accessibilityRole="button"
+        accessibilityLabel={status ? `Status: ${status.text}` : 'Status setzen'}
+        style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', marginTop: -spacing.sm, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.surface2, borderWidth: 1, borderColor: status ? colors.border : 'transparent' }}
+      >
+        <Text variant="small">{status ? status.emoji : '😎'}</Text>
+        <Text variant="small" tone={status ? 'default' : 'secondary'} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {status ? status.text : 'Status setzen'}
+        </Text>
+      </Pressable>
 
       {/* Streaks */}
       <Pressable onPress={() => router.push('/achievements')} accessibilityRole="button" accessibilityLabel="Streaks und Erfolge">

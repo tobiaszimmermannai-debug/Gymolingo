@@ -65,18 +65,25 @@ export function DailyBriefing({ t }: { t: Today }) {
       {account && (
         <View style={{ marginTop: spacing.md, gap: 4 }} testID="briefing-friends">
           <Text variant="caption" tone="muted">
-            Tester zuletzt online
+            Tester: zuletzt online & Status
           </Text>
           {friends?.length ? (
             friends.map((f) => (
-              <Row key={f.user_id} style={{ justifyContent: 'space-between' }}>
-                <Text variant="small">
-                  {f.avatar_emoji} {f.display_name || f.username || 'Freund'}
-                </Text>
-                <Text variant="small" tone={f.last_seen_at && Date.now() - new Date(f.last_seen_at).getTime() < 5 * 60_000 ? 'success' : 'secondary'}>
-                  {f.last_seen_at ? formatLastSeen(f.last_seen_at) : 'nicht geteilt'}
-                </Text>
-              </Row>
+              <View key={f.user_id}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Text variant="small">
+                    {f.avatar_emoji} {f.display_name || f.username || 'Freund'}
+                  </Text>
+                  <Text variant="small" tone={f.last_seen_at && Date.now() - new Date(f.last_seen_at).getTime() < 5 * 60_000 ? 'success' : 'secondary'}>
+                    {f.last_seen_at ? formatLastSeen(f.last_seen_at) : 'nicht geteilt'}
+                  </Text>
+                </Row>
+                {f.status_emoji && (
+                  <Text variant="small" tone="secondary" numberOfLines={1} style={{ marginLeft: 22 }} testID="briefing-friend-status">
+                    {f.status_emoji} {f.status_text}
+                  </Text>
+                )}
+              </View>
             ))
           ) : (
             <Text variant="small" tone="secondary">
