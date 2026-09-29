@@ -145,6 +145,6 @@ Letzte Aktualisierung: 2026-09-28
 - Stand „Ausdauer & EMS, Gruppen-Schlüssel, Privatsphäre-Voreinstellung": core 126/126, DB 61/61, Edge 38/38, E2E lokal 14/14, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. **Blockiert:** Supabase-Werte fehlen im Build (`config/backend.env` leer, keine GitHub-Variablen). Nutzer schickt Project URL + Publishable Key → eintragen, pushen → Pages baut mit Backend. Achtung: Supabase-Projekte vor dem 29.09. brauchen die neuen Migrationen (setup.sql enthält alles; bei bestehendem Projekt nur Migrationen 20260929000005–07 nachziehen). (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
+1. **Supabase verbunden** (`config/backend.env`: ozjugovffdktizmmsvgm). Deploy-Check (`scripts/check-backend.mjs`, Annotations im Workflow) meldet: E-Mail-Bestätigung aus ✅, aber **Tabellen fehlen** → Nutzer muss `supabase/setup.sql` im SQL Editor ausführen; danach Deploy PWA erneut laufen lassen und Annotations prüfen.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.
