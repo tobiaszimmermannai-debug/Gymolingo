@@ -49,6 +49,8 @@ jobs:
           EXPO_PUBLIC_AI_ENABLED: ${{ vars.AI_ENABLED || 'true' }}
         run: npx expo export --platform web --output-dir dist --clear
       - run: node scripts/pwa-base.mjs apps/mobile/dist /${{ github.event.repository.name }}
+      - name: Check Supabase setup (public key only)
+        run: node scripts/check-backend.mjs || true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/mobile/dist
