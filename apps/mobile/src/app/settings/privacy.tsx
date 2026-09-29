@@ -27,6 +27,7 @@ export default function PrivacySettings() {
           <ToggleRow label="Zielerfüllung in %" description="Anteil erreichter Trainings-, Schritt- und Proteinziele" value={p.share_goal_completion} onChange={(v) => savePrivacy({ share_goal_completion: v })} />
           <ToggleRow label="Persönliche Rekorde" value={p.share_prs} onChange={(v) => savePrivacy({ share_prs: v })} />
           <ToggleRow label="Level & Abzeichen" value={p.share_level} onChange={(v) => savePrivacy({ share_level: v })} />
+          <ToggleRow label="Zuletzt online" description="Freunde sehen im Tagesbriefing, wann du die App zuletzt geöffnet hast" value={p.share_online_status ?? true} onChange={(v) => savePrivacy({ share_online_status: v })} testID="privacy-online" />
         </Card>
       </Section>
       <Section title="Sensible Daten (standardmäßig privat)">

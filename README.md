@@ -4,8 +4,8 @@ Gym-, Ernährungs- und Fortschritts-App mit persönlichem Coach – Training wie
 Mobile-first mit **Expo / React Native** (iOS, Android, Web), **local-first** Datenspeicherung und optionalem **Supabase**-Backend.
 
 > **Kostenlos betreibbar:** Die App funktioniert vollständig ohne Server und ohne kostenpflichtige Dienste.
-> Die KI (Google Gemini) ist standardmäßig **aus**; Coach und Wochenbericht rechnen dann direkt auf dem Gerät mit deinen echten Daten.
-> Einrichtung von Supabase (Free), Gemini und der PWA auf GitHub Pages – komplett im Browser:
+> KI über Google Gemini (Gratis-Kontingent, Schlüssel in der App, harte Tageslimits). Ohne Schlüssel rechnen Coach und Wochenbericht direkt auf dem Gerät.
+> Einrichtung (GitHub Pages, Gemini, Supabase per SQL-Datei) – komplett im Browser:
 > Details: [docs/KOSTENLOS_BETREIBEN.md](docs/KOSTENLOS_BETREIBEN.md)
 
 ## Funktionen
@@ -18,7 +18,7 @@ Mobile-first mit **Expo / React Native** (iOS, Android, Web), **local-first** Da
 | **Körper** | Gewicht (7-Tage-Schnitt, 30-Tage-Trend, Körperfett), Maße, KFA-Schätzung (Navy-Formel aus Maßen, optional KI aus Fotos), private Fortschrittsbilder, abendlicher Check-in mit Schritten |
 | **Progress** | 7T / 30T / 90T / 6M / 1J / Alles, Vergleich zur Vorperiode, Kraft, Volumen, Muskelgruppen, Kalorien, Protein, Schritte, Serien, Rekorde |
 | **Motivation** | Reminder-Engine (Ruhezeiten, Tageslimit, Intensität, nicht beschämend), 6 Streaks inkl. Joker & Urlaub/Krankheit, XP, Level, 46 Abzeichen, Wochen-Challenges |
-| **Coach** | Chat & automatischer Wochenbericht (7 Abschnitte, 3 Empfehlungen) – alle Zahlen deterministisch berechnet; KI optional |
+| **Coach** | Tagesbriefing (heutiger Fokus + wann Freunde/Tester zuletzt online waren), Chat & automatischer Wochenbericht (7 Abschnitte, 3 Empfehlungen) – alle Zahlen deterministisch berechnet; KI optional |
 | **Community** | Freunde, Ranglisten, private Challenges, Freundesprofile – Privatsphäre pro Datentyp, sensible Daten standardmäßig privat |
 | **Datenschutz** | Local-first, RLS auf allen Tabellen, JSON-Export, Konto-/Datenlöschung |
 
@@ -54,7 +54,7 @@ npm run db:seed-demo        # optional: Demo-Konto demo@gymolingo.dev / Demo1234
 npm run web
 ```
 
-Für die Produktion: kostenloses Supabase-Projekt (Free-Plan) + Workflow **Deploy backend (Supabase)**, oder manuell `npx supabase link` + `npx supabase db push`. Der Anon-Key ist öffentlich – alle Daten sind per Row-Level-Security geschützt.
+Für die Produktion: kostenloses Supabase-Projekt (Free-Plan), `supabase/setup.sql` einmal im SQL Editor ausführen (oder `npx supabase db push`), URL + Publishable Key in `config/backend.env`. Der Anon-Key ist öffentlich – alle Daten sind per Row-Level-Security geschützt.
 
 ## App-Icon
 Das Logo liegt als Vektor in `assets-src/mark.svg`. Nach Änderungen `node scripts/gen-icons.mjs` ausführen – erzeugt App-Icon, Android-Icons, Splash, Favicon und PWA-Icons. Alternativ eigene PNGs (1024 × 1024) in `apps/mobile/assets/images/` ersetzen.
@@ -62,8 +62,8 @@ Das Logo liegt als Vektor in `assets-src/mark.svg`. Nach Änderungen `node scrip
 ## Tests
 
 ```bash
-npm test                    # 106 Unit-Tests der Domänenlogik (Vitest)
-npm run test:db             # pgTAP: RLS, Last-Write-Wins, Community, Privatsphäre, KI-Tageslimit (lokales Supabase nötig)
+npm test                    # 116 Unit-Tests der Domänenlogik (Vitest)
+npm run test:db             # pgTAP: RLS, Last-Write-Wins, Community, Privatsphäre, KI-Limits, Online-Status (lokales Supabase nötig)
 npm run test:edge           # Edge Functions (Coach, Mahlzeitfoto, KFA, KI-Schlüssel) gegen lokales Supabase + simulierte Gemini-API
 npm run build:web:test && npx playwright test --project=local        # E2E ohne Backend (inkl. PWA-Offline)
 npm run build:web:backend && npx playwright test --project=backend   # E2E mit lokalem Supabase
@@ -75,21 +75,14 @@ npm run typecheck
 | Variable | Wo | Standard | Zweck |
 |---|---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `apps/mobile/.env` | leer → lokaler Modus | Konto, Sync, Community |
-| `EXPO_PUBLIC_AI_ENABLED` | `apps/mobile/.env` | `false` | KI-Coach, Foto-Erkennung, KFA aus Fotos (siehe unten) |
-| Eigener Gemini-Schlüssel | App → Einstellungen → KI | – | kostenlos pro Person, verschlüsselt gespeichert |
-| `AI_KEY_SECRET` | Supabase Secret | vom Deploy-Workflow erzeugt | Verschlüsselung der persönlichen Schlüssel |
-| `GEMINI_MODEL` / `GEMINI_VISION_MODEL` / `AI_DAILY_LIMIT` | Supabase Secret | `gemini-flash-lite-latest` / `gemini-flash-latest` / `40` | Modelle, KI-Anfragen pro Nutzer und Tag |
-| `GEMINI_API_KEY` | Supabase Secret | – | optionaler gemeinsamer Schlüssel (nur mit Abrechnung) |
+| `EXPO_PUBLIC_AI_ENABLED` | Build | `true` | `false` blendet alle KI-Funktionen aus |
+| Gemini-Schlüssel | App → Einstellungen → KI | – | pro Gerät, 25 Anfragen/Tag, Sperre bei Kontingent-Ende |
+| `config/backend.env` | Repository | leer | öffentliche Supabase-URL + Publishable Key für den Web-Build |
 | `EXPO_BASE_URL` | Build-Umgebung | – | Unterordner fürs Hosting (GitHub Pages: `/Gymolingo`) |
 | `EXPO_PUBLIC_DEV_TOOLS` | Build-Umgebung | `false` | Demo-Daten-Button (nur Entwicklung/Tests) |
 
-### Optional: KI aktivieren (Google Gemini, kostenlos per eigenem Schlüssel)
-```bash
-npx supabase secrets set AI_KEY_SECRET="$(openssl rand -base64 32)"
-npx supabase functions deploy coach meal-photo body-fat ai-key
-echo "EXPO_PUBLIC_AI_ENABLED=true" >> apps/mobile/.env
-```
-Danach hinterlegt jede Person in der App unter *Einstellungen → KI* ihren eigenen Gratis-Schlüssel. Per GitHub Actions erledigt der Workflow das automatisch – siehe [docs/KOSTENLOS_BETREIBEN.md](docs/KOSTENLOS_BETREIBEN.md).
+### KI (Google Gemini)
+Schlüssel auf [aistudio.google.com/apikey](https://aistudio.google.com/apikey) erstellen und in der App unter *Einstellungen → KI* einfügen – fertig. Optionaler Server-Modus (gemeinsamer Schlüssel über Edge Functions): siehe [docs/KOSTENLOS_BETREIBEN.md](docs/KOSTENLOS_BETREIBEN.md).
 
 ## Technische Entscheidungen
 - **Local-first:** jede Eingabe wird sofort lokal gespeichert (SQLite-KV nativ, IndexedDB im Web) und im Hintergrund synchronisiert – Training im Keller ohne Netz funktioniert.

@@ -15,6 +15,7 @@ import { startWorkoutForDay } from '@/features/workoutStart';
 import { useExerciseLookup, useRows } from '@/data/hooks';
 import { BADGE_MAP } from '@gymolingo/core';
 import { SyncBadge } from '@/features/SyncBadge';
+import { DailyBriefing } from '@/features/DailyBriefing';
 
 const STREAK_ICONS: Record<StreakKind, string> = { training: '🏋️', nutrition: '📒', protein: '🥩', steps: '👟', checkin: '🌙', weight: '⚖️' };
 
@@ -252,20 +253,7 @@ export default function Home() {
         ))}
       </Section>
 
-      <Card onPress={() => router.push('/coach')} testID="home-coach-card" accessibilityLabel="KI-Coach öffnen">
-        <Row>
-          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="sparkles" size={22} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="bodyMedium">Frag deinen Coach</Text>
-            <Text variant="small" tone="secondary">
-              Gewichte, Plateaus, Protein, Wochenbericht – basierend auf deinen Daten
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </Row>
-      </Card>
+      <DailyBriefing t={t} />
     </Screen>
   );
 }

@@ -26,3 +26,19 @@ export function formatDuration(seconds: number): string {
   const pad = (x: number) => String(x).padStart(2, '0');
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
+
+/** "gerade online", "vor 12 Min.", "heute 08:12", "gestern 21:40", "vor 3 Tagen", "am 12.08." */
+export function formatLastSeen(iso: string | null, now = new Date()): string {
+  if (!iso) return 'noch nie online';
+  const t = new Date(iso);
+  const mins = Math.floor((now.getTime() - t.getTime()) / 60000);
+  if (mins < 5) return 'gerade online';
+  if (mins < 60) return `vor ${mins} Min.`;
+  const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(t)) / 86400000);
+  if (days === 0) return `heute ${hhmm}`;
+  if (days === 1) return `gestern ${hhmm}`;
+  if (days < 30) return `vor ${days} Tagen`;
+  return `am ${String(t.getDate()).padStart(2, '0')}.${String(t.getMonth() + 1).padStart(2, '0')}.`;
+}

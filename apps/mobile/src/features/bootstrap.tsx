@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadPendingPhotos } from './photoSync';
 import { registerServiceWorker } from '@/lib/pwa';
 import { refreshAiKeyStatus } from '@/lib/ai';
+import { refreshFriendsActivity, touchLastSeen } from './presence';
 
 export function AppBootstrap() {
   const onboarded = useDB((s) => !!s.tables.athlete_profiles[s.userId]?.onboarding_completed);
@@ -52,6 +53,8 @@ function useAutoSync() {
     if (!account) return;
     const run = () => {
       void syncNow().then(() => uploadPendingPhotos());
+      void touchLastSeen();
+      void refreshFriendsActivity();
     };
     run();
     void refreshAiKeyStatus();

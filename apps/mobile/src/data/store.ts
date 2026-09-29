@@ -35,8 +35,15 @@ export interface DBState {
     friendsCount?: number;
     /** user agreed that progress photos may be sent to the AI (Gemini) for body fat estimates */
     aiPhotoConsent?: boolean;
-    /** server-side status of the personal Gemini key (the key itself never comes back) */
+    /** server status: is a shared Gemini key configured on Supabase? */
     aiKey?: { configured: boolean; hint: string | null; fallback: boolean };
+    /** Gemini key stored on this device only (never synced) */
+    geminiKey?: string;
+    /** on-device AI limits: requests today, models blocked after a quota answer (ISO until) */
+    aiUsage?: { day: string; count: number };
+    aiBlocks?: Record<string, string>;
+    /** friends' "zuletzt online" for the coach briefing */
+    friendsActivity?: { fetchedAt: string; rows: { user_id: string; username: string | null; display_name: string; avatar_emoji: string; last_seen_at: string | null }[] };
   };
 }
 

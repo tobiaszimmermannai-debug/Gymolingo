@@ -1,9 +1,10 @@
 # Builds the web app (PWA) and publishes it for free on GitHub Pages:
 #   https://<user>.github.io/<repo>/
 # One-time: Settings → Pages → Source: "GitHub Actions".
-# Optional repository variables (Settings → Secrets and variables → Actions → Variables):
-#   SUPABASE_URL, SUPABASE_ANON_KEY  → account, sync & community (otherwise local mode)
-#   AI_ENABLED=true                  → show AI features (needs GEMINI_API_KEY on Supabase)
+# Backend (optional): public Supabase URL + publishable key in config/backend.env
+# (or repository variables SUPABASE_URL / SUPABASE_ANON_KEY). Empty = local mode.
+# AI: each tester stores a free Gemini key in the app (Settings → KI);
+#     set the variable AI_ENABLED=false to hide AI entirely.
 name: Deploy PWA (GitHub Pages)
 on:
   push:
@@ -28,13 +29,24 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Backend config (public values)
+        env:
+          V_URL: ${{ vars.SUPABASE_URL }}
+          V_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          URL="$V_URL"; KEY="$V_KEY"
+          if [ -z "$URL" ] && [ -f config/backend.env ]; then
+            URL="$(grep -E '^SUPABASE_URL=' config/backend.env | cut -d= -f2-)"
+            KEY="$(grep -E '^SUPABASE_ANON_KEY=' config/backend.env | cut -d= -f2-)"
+          fi
+          echo "EXPO_PUBLIC_SUPABASE_URL=$URL" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$KEY" >> "$GITHUB_ENV"
+          if [ -n "$URL" ]; then echo "::notice::Backend: $URL"; else echo "::notice::Kein Backend konfiguriert – lokaler Modus."; fi
       - name: Build web app
         working-directory: apps/mobile
         env:
           EXPO_BASE_URL: /${{ github.event.repository.name }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_AI_ENABLED: ${{ vars.AI_ENABLED || 'false' }}
+          EXPO_PUBLIC_AI_ENABLED: ${{ vars.AI_ENABLED || 'true' }}
         run: npx expo export --platform web --output-dir dist --clear
       - run: node scripts/pwa-base.mjs apps/mobile/dist /${{ github.event.repository.name }}
       - uses: actions/upload-pages-artifact@v3

@@ -334,6 +334,8 @@ export interface PrivacySettings extends BaseRow {
   share_body_fat: boolean;
   share_nutrition: boolean;
   share_photos: boolean;
+  /** friends see when you were last online (coach briefing) */
+  share_online_status: boolean;
 }
 
 export interface CoachMessage extends BaseRow {

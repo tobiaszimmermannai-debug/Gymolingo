@@ -14,3 +14,5 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:core
+      - name: supabase/setup.sql is up to date
+        run: npm run build:setup-sql && git diff --exit-code supabase/setup.sql

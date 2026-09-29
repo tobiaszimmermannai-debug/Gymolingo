@@ -119,6 +119,20 @@ function formatDuration(seconds) {
   const pad2 = (x) => String(x).padStart(2, "0");
   return h > 0 ? `${h}:${pad2(m)}:${pad2(sec)}` : `${m}:${pad2(sec)}`;
 }
+function formatLastSeen(iso, now = /* @__PURE__ */ new Date()) {
+  if (!iso) return "noch nie online";
+  const t = new Date(iso);
+  const mins = Math.floor((now.getTime() - t.getTime()) / 6e4);
+  if (mins < 5) return "gerade online";
+  if (mins < 60) return `vor ${mins} Min.`;
+  const hhmm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(t)) / 864e5);
+  if (days === 0) return `heute ${hhmm}`;
+  if (days === 1) return `gestern ${hhmm}`;
+  if (days < 30) return `vor ${days} Tagen`;
+  return `am ${String(t.getDate()).padStart(2, "0")}.${String(t.getMonth() + 1).padStart(2, "0")}.`;
+}
 
 // src/nutrition/targets.ts
 var ACTIVITY_FACTORS = {
@@ -2973,12 +2987,299 @@ function generateDemoData(opts) {
     body_measurements: measurements
   };
 }
+
+// src/ai/gemini.ts
+var GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
+var GEMINI_TEXT_MODEL = "gemini-flash-lite-latest";
+var GEMINI_VISION_MODEL = "gemini-flash-latest";
+var GeminiError = class extends Error {
+  constructor(message, status, code, retryAfterSec = 60, daily = false) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.retryAfterSec = retryAfterSec;
+    this.daily = daily;
+  }
+};
+function secondsUntilDailyReset(now = /* @__PURE__ */ new Date()) {
+  const pt = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const next = new Date(pt);
+  next.setHours(24, 0, 0, 0);
+  return Math.max(60, Math.round((next.getTime() - pt.getTime()) / 1e3) + 60);
+}
+function rateLimitInfo(details, now = /* @__PURE__ */ new Date()) {
+  const text = JSON.stringify(details ?? "");
+  if (/PerDay/i.test(text)) return { daily: true, retryAfterSec: secondsUntilDailyReset(now) };
+  const m = text.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  return { daily: false, retryAfterSec: m ? Math.ceil(Number(m[1])) : 60 };
+}
+function toGeminiSchema(s) {
+  if (Array.isArray(s)) return s.map(toGeminiSchema);
+  if (s && typeof s === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(s)) if (k !== "additionalProperties") out[k] = toGeminiSchema(v);
+    return out;
+  }
+  return s;
+}
+async function timedFetch(f, url, init, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await f(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+var BLOCK_REASONS = ["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY", "RECITATION"];
+async function geminiGenerate(key, p, cfg = {}) {
+  const f = cfg.fetchImpl ?? fetch;
+  const generationConfig = { temperature: p.temperature ?? 0.4, maxOutputTokens: p.maxOutputTokens ?? 4096 };
+  if (p.jsonSchema) {
+    generationConfig.responseMimeType = "application/json";
+    generationConfig.responseJsonSchema = toGeminiSchema(p.jsonSchema);
+  }
+  let res;
+  try {
+    res = await timedFetch(
+      f,
+      `${cfg.base ?? GEMINI_API_BASE}/v1beta/models/${encodeURIComponent(p.model)}:generateContent`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: p.system }] }, contents: p.contents, generationConfig })
+      },
+      p.timeoutMs ?? 45e3
+    );
+  } catch (e) {
+    throw new GeminiError(`KI-Dienst nicht erreichbar (${e instanceof Error ? e.name : "Netzwerk"}).`, 502, "unavailable");
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = body.error?.message ?? res.statusText;
+    if (res.status === 429) {
+      const info = rateLimitInfo(body.error?.details);
+      throw new GeminiError(
+        info.daily ? "Das kostenlose KI-Tageskontingent ist aufgebraucht \u2013 die KI ist bis morgen gesperrt." : "Das KI-Kontingent ist gerade ausgesch\xF6pft \u2013 bitte in einer Minute erneut versuchen.",
+        429,
+        "rate_limited",
+        info.retryAfterSec,
+        info.daily
+      );
+    }
+    if (res.status === 401 || res.status === 403 || /API key/i.test(msg)) throw new GeminiError("Der Gemini-Schl\xFCssel ist ung\xFCltig.", 503, "bad_key");
+    if (res.status === 400) throw new GeminiError(`Ung\xFCltige KI-Anfrage: ${msg}`, 400, "bad_request");
+    throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}).`, 502, "unavailable");
+  }
+  const used = body.modelVersion ?? p.model;
+  if (body.promptFeedback?.blockReason) return { text: null, model: used, blocked: true };
+  const cand = body.candidates?.[0];
+  if (BLOCK_REASONS.includes(cand?.finishReason ?? "")) return { text: null, model: used, blocked: true };
+  const text = (cand?.content?.parts ?? []).filter((x) => !x.thought && typeof x.text === "string").map((x) => x.text).join("").trim();
+  return { text: text || null, model: used, blocked: false };
+}
+async function geminiValidateKey(key, cfg = {}) {
+  const f = cfg.fetchImpl ?? fetch;
+  try {
+    const res = await timedFetch(f, `${cfg.base ?? GEMINI_API_BASE}/v1beta/models/${encodeURIComponent(cfg.textModel ?? GEMINI_TEXT_MODEL)}`, { headers: { "x-goog-api-key": key } }, 15e3);
+    if (res.ok || res.status === 429) return "ok";
+    if ([400, 401, 403].includes(res.status)) return "invalid";
+    return "unavailable";
+  } catch {
+    return "unavailable";
+  }
+}
+async function geminiGuarded(key, models, p, store, cfg = {}) {
+  let last = null;
+  for (const model of [...new Set(models)]) {
+    if (await store.isBlocked(model)) continue;
+    try {
+      return await geminiGenerate(key, { ...p, model }, cfg);
+    } catch (e) {
+      if (!(e instanceof GeminiError) || e.code !== "rate_limited") throw e;
+      last = e;
+      await store.block(model, e.retryAfterSec, e.daily ? "daily quota" : "rate limit");
+    }
+  }
+  throw last ?? new GeminiError("Das kostenlose KI-Kontingent ist aufgebraucht \u2013 die KI ist vor\xFCbergehend gesperrt.", 429, "rate_limited", 60, true);
+}
+function describeGeminiError(e) {
+  if (e instanceof GeminiError) return { status: e.status, message: e.message };
+  if (e instanceof SyntaxError) return { status: 502, message: "Die KI-Antwort war unvollst\xE4ndig." };
+  return { status: 500, message: e instanceof Error ? e.message : String(e) };
+}
+
+// src/ai/tasks.ts
+var REPORT_SCHEMA = {
+  type: "object",
+  properties: {
+    sections: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { heading: { type: "string" }, body: { type: "string" } },
+        required: ["heading", "body"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["sections"],
+  additionalProperties: false
+};
+var MEAL_PHOTO_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          grams: { type: "number" },
+          kcal: { type: "number" },
+          protein_g: { type: "number" },
+          carbs_g: { type: "number" },
+          fat_g: { type: "number" },
+          confidence: { type: "string", enum: ["low", "medium", "high"] }
+        },
+        required: ["name", "grams", "kcal", "protein_g", "carbs_g", "fat_g", "confidence"],
+        additionalProperties: false
+      }
+    },
+    note: { type: "string" }
+  },
+  required: ["items", "note"],
+  additionalProperties: false
+};
+var MEAL_PHOTO_SYSTEM = `Du sch\xE4tzt Lebensmittel und N\xE4hrwerte auf Fotos von Mahlzeiten f\xFCr eine deutsche Fitness-App.
+- Erkenne die einzelnen Komponenten (deutsche Bezeichnungen) und sch\xE4tze das Gewicht in Gramm.
+- N\xE4hrwerte (kcal, Protein, Kohlenhydrate, Fett) f\xFCr die gesch\xE4tzte Menge, orientiert an typischen deutschen Durchschnittswerten.
+- confidence: "low" bei verdeckten Zutaten/unklaren Mengen, "medium" im Normalfall, "high" nur bei eindeutig erkennbaren, portionierten Lebensmitteln.
+- Ber\xFCcksichtige typisches Bratfett/So\xDFen, wenn sichtbar, und erw\xE4hne Unsicherheiten kurz in "note" (Deutsch, 1\u20132 S\xE4tze).
+- Wenn kein Essen erkennbar ist: leere items-Liste und Erkl\xE4rung in "note".`;
+var BODY_FAT_SCHEMA = {
+  type: "object",
+  properties: {
+    usable: { type: "boolean" },
+    body_fat_pct: { type: "number" },
+    range_low: { type: "number" },
+    range_high: { type: "number" },
+    confidence: { type: "string", enum: ["low", "medium", "high"] },
+    cues: { type: "string" },
+    photo_tips: { type: "string" }
+  },
+  required: ["usable", "body_fat_pct", "range_low", "range_high", "confidence", "cues", "photo_tips"],
+  additionalProperties: false
+};
+var BODY_FAT_SYSTEM = `Du sch\xE4tzt f\xFCr eine deutsche Fitness-App den K\xF6rperfettanteil (KFA) einer erwachsenen Person anhand von Fortschrittsfotos \u2013 so, wie es ein erfahrener Coach visuell tun w\xFCrde.
+- Nutze sichtbare Merkmale: Definition von Bauch, Schultern, Armen und R\xFCcken, Taillenform, Fettverteilung, Venen/Separation. Ber\xFCcksichtige Geschlecht, Alter, Gr\xF6\xDFe und Gewicht, falls angegeben.
+- Gib einen Punktwert und eine realistische Spanne (mindestens 4 Prozentpunkte breit) an. Visuelle Sch\xE4tzungen haben typischerweise \xB13\u20135 Prozentpunkte Fehler.
+- confidence: "low" bei weiter Kleidung, schlechtem Licht, ung\xFCnstigem Winkel oder nur einem Foto; "medium" im Normalfall; "high" nur bei guten, eng anliegenden Front- und Seitenfotos.
+- cues: 1\u20132 sachliche S\xE4tze auf Deutsch, woran du dich orientierst. Keine Bewertung des Aussehens, keine Kommentare zur Attraktivit\xE4t, nicht wertend.
+- photo_tips: 1 Satz, wie die n\xE4chsten Fotos vergleichbarer werden (Licht, Abstand, Pose, Kleidung).
+- Wenn keine erwachsene Person erkennbar oder der Oberk\xF6rper nicht beurteilbar ist: usable=false, Werte 0 und Erkl\xE4rung in cues.`;
+var POSE_DE = { front: "von vorne", side: "seitlich", back: "von hinten" };
+var conf = (v) => ["low", "medium", "high"].includes(String(v)) ? v : "low";
+function sanitizeMealItems(parsed) {
+  return (parsed.items ?? []).map((i) => ({
+    name: String(i.name ?? "").slice(0, 120),
+    grams: Math.max(1, Math.min(3e3, Number(i.grams) || 0)),
+    kcal: Math.max(0, Math.min(5e3, Number(i.kcal) || 0)),
+    protein_g: Math.max(0, Number(i.protein_g) || 0),
+    carbs_g: Math.max(0, Number(i.carbs_g) || 0),
+    fat_g: Math.max(0, Number(i.fat_g) || 0),
+    confidence: conf(i.confidence)
+  })).filter((i) => i.name && i.grams > 0);
+}
+function sanitizeBodyFat(o, model) {
+  const clamp2 = (v) => Math.round(Math.max(3, Math.min(60, Number(v) || 0)) * 10) / 10;
+  if (!o.usable || !(Number(o.body_fat_pct) > 0)) return { usable: false, cues: String(o.cues ?? "").slice(0, 400), model };
+  const est = clamp2(o.body_fat_pct);
+  let lo = Math.min(clamp2(o.range_low), est);
+  let hi = Math.max(clamp2(o.range_high), est);
+  if (hi - lo < 4) {
+    lo = Math.max(3, Math.round((est - 2) * 10) / 10);
+    hi = Math.min(60, Math.round((est + 2) * 10) / 10);
+  }
+  return {
+    usable: true,
+    body_fat_pct: est,
+    range_low: lo,
+    range_high: hi,
+    confidence: conf(o.confidence),
+    cues: String(o.cues ?? "").slice(0, 400),
+    photo_tips: String(o.photo_tips ?? "").slice(0, 300),
+    model
+  };
+}
+function bodyFatFacts(profile, latest, year = (/* @__PURE__ */ new Date()).getFullYear()) {
+  const facts = [
+    profile?.sex === "male" ? "Geschlecht: m\xE4nnlich" : profile?.sex === "female" ? "Geschlecht: weiblich" : null,
+    profile?.birth_year ? `Alter: ca. ${year - Number(profile.birth_year)} Jahre` : null,
+    profile?.height_cm ? `Gr\xF6\xDFe: ${Number(profile.height_cm)} cm` : null,
+    latest?.weight_kg ? `Gewicht: ${Number(latest.weight_kg)} kg (${latest.date})` : null
+  ].filter(Boolean);
+  return facts.length ? `Angaben: ${facts.join(", ")}.` : "Keine weiteren Angaben.";
+}
+var textModels = (cfg) => [cfg?.textModel ?? GEMINI_TEXT_MODEL];
+var photoModels = (cfg) => [cfg?.visionModel ?? GEMINI_VISION_MODEL, cfg?.textModel ?? GEMINI_TEXT_MODEL];
+async function aiCoachReply(r, ctx, question, history) {
+  const turns = history.filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim()).slice(-10).map((m) => ({ role: m.role === "user" ? "user" : "model", parts: [{ text: m.content.slice(0, 4e3) }] }));
+  while (turns.length && turns[0].role !== "user") turns.shift();
+  const res = await geminiGuarded(r.key, textModels(r.cfg), { system: COACH_SYSTEM_PROMPT, contents: [...turns, { role: "user", parts: [{ text: buildCoachUserMessage(ctx, question.slice(0, 2e3)) }] }], temperature: 0.5 }, r.store, r.cfg);
+  return res.blocked || !res.text ? null : { text: res.text, model: res.model };
+}
+async function aiWeeklyReportSections(r, stats, displayName, goal) {
+  const res = await geminiGuarded(
+    r.key,
+    textModels(r.cfg),
+    {
+      system: `${COACH_SYSTEM_PROMPT}
+
+${WEEKLY_REPORT_PROMPT}`,
+      contents: [{ role: "user", parts: [{ text: `<wochenstatistik>
+${JSON.stringify(stats)}
+</wochenstatistik>
+
+Nutzer: ${displayName || "Athlet"}, Ziel: ${goal}.` }] }],
+      jsonSchema: REPORT_SCHEMA,
+      temperature: 0.4,
+      maxOutputTokens: 8192
+    },
+    r.store,
+    r.cfg
+  );
+  if (res.blocked || !res.text) return null;
+  const parsed = JSON.parse(res.text);
+  if (!Array.isArray(parsed.sections) || parsed.sections.length < 3) return null;
+  return { sections: parsed.sections.map((s) => ({ heading: String(s.heading).slice(0, 120), body: String(s.body).slice(0, 2e3) })), model: res.model };
+}
+async function aiMealPhoto(r, image, hint) {
+  const parts = [{ inlineData: { mimeType: image.mediaType, data: image.data } }, { text: hint ? `Hinweis des Nutzers: ${hint.slice(0, 300)}` : "Bitte analysiere diese Mahlzeit." }];
+  const res = await geminiGuarded(r.key, photoModels(r.cfg), { system: MEAL_PHOTO_SYSTEM, jsonSchema: MEAL_PHOTO_SCHEMA, temperature: 0.2, contents: [{ role: "user", parts }] }, r.store, r.cfg);
+  if (res.blocked || !res.text) return null;
+  const parsed = JSON.parse(res.text);
+  return { items: sanitizeMealItems(parsed), note: String(parsed.note ?? ""), model: res.model };
+}
+async function aiBodyFat(r, images, facts) {
+  const parts = [];
+  for (const img of images.slice(0, 3)) {
+    parts.push({ text: `Foto ${POSE_DE[img.pose] ?? ""}`.trim() });
+    parts.push({ inlineData: { mimeType: img.mediaType, data: img.data } });
+  }
+  parts.push({ text: facts });
+  const res = await geminiGuarded(r.key, photoModels(r.cfg), { system: BODY_FAT_SYSTEM, jsonSchema: BODY_FAT_SCHEMA, temperature: 0.2, contents: [{ role: "user", parts }] }, r.store, r.cfg);
+  if (res.blocked || !res.text) return null;
+  return sanitizeBodyFat(JSON.parse(res.text), res.model);
+}
 export {
   ACTIVITY_FACTORS,
   ACTIVITY_LABELS_DE,
   ALLERGEN_LABELS_DE,
   BADGES,
   BADGE_MAP,
+  BODY_FAT_SCHEMA,
+  BODY_FAT_SYSTEM,
   COACH_SYSTEM_PROMPT,
   DEFAULT_REMINDER_SETTINGS,
   EMPTY_TOTALS,
@@ -2987,14 +3288,21 @@ export {
   EXERCISE_MAP,
   FOODS,
   FOOD_MAP,
+  GEMINI_API_BASE,
+  GEMINI_TEXT_MODEL,
+  GEMINI_VISION_MODEL,
+  GeminiError,
   MAX_REPS_FOR_ESTIMATE,
   MEAL_LABELS_DE,
   MEAL_ORDER,
+  MEAL_PHOTO_SCHEMA,
+  MEAL_PHOTO_SYSTEM,
   MUSCLE_GROUP_BUCKETS,
   MUSCLE_LABELS_DE,
   OFF_BASE,
   OFF_USER_AGENT,
   PERIOD_DAYS,
+  REPORT_SCHEMA,
   STREAK_LABELS_DE,
   STREAK_MILESTONES,
   WEEKDAY_LONG_DE,
@@ -3004,9 +3312,14 @@ export {
   adaptiveCalorieAdjustment,
   addDays,
   ageFromBirthYear,
+  aiBodyFat,
+  aiCoachReply,
+  aiMealPhoto,
+  aiWeeklyReportSections,
   answerOffline,
   bestStreaksFrom,
   bmi,
+  bodyFatFacts,
   buildCoachContext,
   buildCoachUserMessage,
   buildDailyActivities,
@@ -3024,6 +3337,7 @@ export {
   dateRange,
   dayNutrition,
   daysBetween,
+  describeGeminiError,
   detectPlateau,
   diffDays,
   e1rmSeries,
@@ -3041,8 +3355,12 @@ export {
   formatDateDE,
   formatDuration,
   formatKg,
+  formatLastSeen,
   formatNumberDE,
   formatSigned,
+  geminiGenerate,
+  geminiGuarded,
+  geminiValidateKey,
   generateDemoData,
   generatePlanTemplate,
   isBetween,
@@ -3079,15 +3397,19 @@ export {
   planRemindersForDay,
   progressReps,
   proteinIdea,
+  rateLimitInfo,
   recipeNutrients,
   remainingForDay,
   renderWeeklyReportText,
   repsAtWeight,
   resolveExercise,
   roundToIncrement,
+  sanitizeBodyFat,
+  sanitizeMealItems,
   searchExercises,
   searchFoods,
   searchOff,
+  secondsUntilDailyReset,
   sessionDurationSec,
   sessionE1RM,
   sessionPRs,
@@ -3109,6 +3431,7 @@ export {
   summarizeSession,
   syncAll,
   timeToMinutes,
+  toGeminiSchema,
   toISODate,
   todayISO,
   trainedDates,

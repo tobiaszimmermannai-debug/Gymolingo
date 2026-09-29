@@ -3,10 +3,11 @@ import { completeOnboarding } from './helpers';
 
 test('offline coach answers from real data and weekly report is generated automatically', async ({ page }) => {
   await completeOnboarding(page);
-  // Photo AI is disabled in the zero-cost configuration → no dead button
+  // without a Gemini key the photo action explains how to enable it (nothing is sent anywhere)
   await page.goto('/nutrition/add?meal=lunch');
-  await expect(page.getByTestId('action-quick')).toBeVisible();
-  await expect(page.getByTestId('action-photo')).toHaveCount(0);
+  await page.getByTestId('action-photo').click();
+  await expect(page.getByTestId('meal-photo-unavailable')).toContainText('Gemini-Schlüssel fehlt');
+  await expect(page.getByTestId('meal-photo-setup-key')).toBeVisible();
 
   await page.goto('/');
   await page.getByTestId('home-coach-card').click();

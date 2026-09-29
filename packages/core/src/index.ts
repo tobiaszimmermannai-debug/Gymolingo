@@ -22,3 +22,5 @@ export * from './sync/engine';
 export * from './training/templates';
 export * from './nutrition/tips';
 export * from './dev/demo';
+export * from './ai/gemini';
+export * from './ai/tasks';

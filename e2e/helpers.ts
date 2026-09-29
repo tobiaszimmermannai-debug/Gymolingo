@@ -24,3 +24,15 @@ export async function completeOnboarding(page: Page, opts: { name?: string; goal
   await page.getByTestId('onboarding-finish').click();
   await expect(page.getByTestId('home-screen')).toBeVisible();
 }
+
+/** width/height from a JPEG's SOF marker */
+export function jpegSize(buf: Buffer): { width: number; height: number } {
+  let i = 2;
+  while (i < buf.length) {
+    const marker = buf.readUInt16BE(i);
+    const len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xffc0 && marker <= 0xffc3) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    i += 2 + len;
+  }
+  throw new Error('no SOF marker');
+}

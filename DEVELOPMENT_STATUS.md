@@ -16,7 +16,7 @@ Letzte Aktualisierung: 2026-09-28
 | Daten | Local-first Zustand-Store (`apps/mobile/src/data`), persistiert in SQLite-KV (nativ) / IndexedDB (Web) |
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions), RLS auf allen Tabellen |
 | Sync | Outbox + Pull-Cursor (`server_updated_at`), Last-Write-Wins auf `updated_at` (Client + DB-Trigger), Soft-Deletes |
-| KI | **Google Gemini** (REST; Flash-Lite für Text, Flash für Fotos mit Fallback), **eigener Gratis-Schlüssel pro Nutzer** (verschlüsselt in `ai_keys`, Edge Function `ai-key`), Tageslimit pro Nutzer (`ai_usage`). Ohne KI: regelbasierter Coach auf dem Gerät. Statistiken immer aus `@gymolingo/core` |
+| KI | **Google Gemini** (REST-Client + Prompts in `packages/core/src/ai`, von App und Edge Functions geteilt). Standard: **Schlüssel auf dem Gerät** (Einstellungen → KI), App ruft Google direkt – 25 Anfragen/Tag/Person, Circuit Breaker bei 429. Optional Server-Modus (Edge Functions, `GEMINI_API_KEY`, Limits 25/75). Ohne KI: regelbasierter Coach auf dem Gerät. Statistiken immer aus `@gymolingo/core` |
 | Lebensmittel | Eigene deutsche Basis-DB (~140 Einträge, Durchschnittswerte) + Open Food Facts (Suche, Barcode) + eigene Lebensmittel/Rezepte |
 | Tests | Vitest (core), pgTAP via psql (`scripts/test-db.sh`), Playwright E2E gegen den Web-Build |
 
@@ -83,6 +83,7 @@ Letzte Aktualisierung: 2026-09-28
 ### 9. KI-Coach
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
+- ✅ Tagesbriefing auf Home (heutiger Fokus, offene Kalorien/Protein, gefährdete Serie, Tester zuletzt online)
 - ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
 - ✅ Edge Functions `coach`, `meal-photo`, `body-fat`, `ai-key` auf Gemini (persönliche Schlüssel, JSON-Schema, Safety/429-Fallback, Flash→Flash-Lite, Tageslimit) – 38 Checks gegen lokales Supabase + Mock-Gemini (inkl. Sperre bei Kontingent-Ende)
 
@@ -97,11 +98,11 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
-- ✅ core: 106 Unit-Tests (Vitest)
-- ✅ DB: 49 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren)
+- ✅ core: 116 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker)
+- ✅ DB: 54 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status); `setup.sql` auf frischer DB verifiziert
 - ✅ Edge Functions: 38 Checks (`npm run test:edge`)
-- ✅ E2E lokal (12, inkl. KFA Navy): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (6): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync, Fortschrittsbilder, KI-Schlüssel einrichten + KI-KFA aus Fotos (gemockte Functions)
+- ✅ E2E lokal (13, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
+- ✅ E2E Backend (5): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges + „zuletzt online“ im Briefing, Kontolöschung, Offline-Sync, Fortschrittsbilder
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -123,7 +124,9 @@ Letzte Aktualisierung: 2026-09-28
 ## Entscheidungen
 - **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
-- Testphase (Nutzerwunsch): **ein gemeinsamer Gratis-Schlüssel** (`GEMINI_API_KEY`) für 2 Personen; harte Grenzen: pro Person 40/Tag, gesamt 150/Tag (`ai_usage_global`), Circuit Breaker `ai_model_blocks` bei 429 (Tageskontingent → Sperre bis Reset, Minutenlimit → Sperre für RetryInfo-Dauer).
+- Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.
+- Einrichtung vereinfacht (Nutzer kam mit Secrets/Tokens nicht zurecht): `supabase/setup.sql` (aus Migrationen generiert, CI prüft Aktualität) im SQL Editor ausführen; öffentliche URL/Key in `config/backend.env`; Pages 1 Klick.
+- „Zuletzt online“: `profiles.last_seen_at`, `touch_last_seen()`, `friends_activity()` (nur Freunde, abschaltbar via `share_online_status`), Anzeige im **Tagesbriefing** auf Home.
 - Edge Functions prüfen den Nutzer selbst (`verify_jwt = false`, `auth.getUser`) – kompatibel mit neuen Supabase-Signaturschlüsseln; `apikey` wird aus der Anfrage übernommen.
 - App-Icon blau (Verlauf #3B82F6→#1D4ED8, weißes G); App-Oberfläche bleibt Anthrazit/Lime.
 - KFA: primär aus Fotos (startet automatisch nach neuem Foto, Einwilligung einmalig), Navy-Formel als Alternative ohne KI.
@@ -134,9 +137,9 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „KI-Sperren, gemeinsamer Test-Schlüssel": core 106/106, DB 49/49, Edge 38/38, E2E lokal 12/12, E2E Backend 6/6, Typecheck grün.
+- Stand „Schlüssel in der App, Tagesbriefing, setup.sql": core 116/116, DB 54/54, Edge 38/38, E2E lokal 13/13, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. Nutzer richtet Supabase + GitHub ein (Pages macht er später) (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
+1. Nutzer: Pages einschalten, Gemini-Schlüssel in der App, Supabase-Projekt + `setup.sql` → URL/Publishable Key in `config/backend.env` eintragen (oder vom Nutzer übernehmen) → Live-Test (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

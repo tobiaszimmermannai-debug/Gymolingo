@@ -3,6 +3,7 @@
  * SECURITY DEFINER functions – the client never reads other users' rows.
  */
 import { supabase } from '@/lib/supabase';
+import { refreshFriendsActivity } from './presence';
 
 export interface FriendRow {
   request_id: string;
@@ -88,7 +89,7 @@ export const community = {
   friends: () => rpc<FriendRow[]>('list_friends'),
   search: (q: string) => rpc<SearchRow[]>('search_users', { p_query: q }),
   sendRequest: (username: string) => rpc<string>('send_friend_request', { p_username: username }),
-  respond: (requestId: string, accept: boolean) => rpc<void>('respond_friend_request', { p_request_id: requestId, p_accept: accept }),
+  respond: (requestId: string, accept: boolean) => rpc<void>('respond_friend_request', { p_request_id: requestId, p_accept: accept }).then(() => void refreshFriendsActivity(true)),
   remove: (userId: string) => rpc<void>('remove_friend', { p_user_id: userId }),
   profile: (userId: string) => rpc<Record<string, unknown>>('get_friend_profile', { p_user_id: userId }),
   leaderboard: (from: string, to: string) => rpc<LeaderRow[]>('friend_leaderboard', { p_from: from, p_to: to }),

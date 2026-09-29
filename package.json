@@ -22,7 +22,8 @@
     "build:edge-core": "npm run build:edge -w @gymolingo/core",
     "db:seed-demo": "node scripts/seed-demo.mjs",
     "build:web:test": "cd apps/mobile && EXPO_PUBLIC_DEV_TOOLS=true expo export --platform web --output-dir dist --clear",
-    "test:edge": "node scripts/test-edge.mjs"
+    "test:edge": "node scripts/test-edge.mjs",
+    "build:setup-sql": "node scripts/build-setup-sql.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

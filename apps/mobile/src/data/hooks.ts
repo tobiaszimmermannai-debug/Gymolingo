@@ -66,6 +66,7 @@ export const DEFAULT_PRIVACY: Omit<PrivacySettings, keyof BaseRow> = {
   share_body_fat: false,
   share_nutrition: false,
   share_photos: false,
+  share_online_status: true,
 };
 
 export function useProfile(): AthleteProfile | undefined {

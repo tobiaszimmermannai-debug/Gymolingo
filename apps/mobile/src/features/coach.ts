@@ -55,9 +55,11 @@ export async function sendCoachMessage(text: string, ctx: CoachContext): Promise
   let source: 'ai' | 'rules' = 'rules';
   if (aiAvailability() === 'ok') {
     try {
-      const r = await askCoach(text, history, todayISO());
-      reply = r.reply;
-      source = r.source;
+      const r = await askCoach(text, history, ctx);
+      if (r) {
+        reply = r.reply;
+        source = r.source;
+      }
     } catch {
       // offline or server problem → rule-based answer from the same data
     }
@@ -109,8 +111,8 @@ export async function ensureWeeklyReport(weekStartDate: string, force = false): 
   let view: ReportView = { week_start: ws, stats, content: renderWeeklyReportText(stats), source: 'rules', model: null };
   if (aiAvailability() === 'ok' && (force || !existing)) {
     try {
-      const r = await aiWeeklyReport(ws, todayISO());
-      if (r.source === 'ai') view = { ...view, content: { title: view.content.title, sections: r.sections }, source: 'ai', model: r.model ?? null };
+      const r = await aiWeeklyReport(ws, stats, data.profile.display_name, data.profile.goal);
+      if (r && r.source === 'ai') view = { ...view, content: { title: view.content.title, sections: r.sections }, source: 'ai', model: r.model ?? null };
     } catch {
       // keep rule-based report
     }

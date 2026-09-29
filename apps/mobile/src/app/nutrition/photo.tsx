@@ -93,19 +93,14 @@ export default function PhotoMeal() {
   if (availability !== 'ok') {
     return (
       <Screen title="Foto-Erkennung" back>
-        <Card>
-          <Text variant="h3">{availability === 'disabled' ? 'KI-Fotoerkennung ist deaktiviert' : availability === 'no_key' ? 'Gemini-Schlüssel fehlt' : 'KI-Fotoerkennung benötigt ein Konto'}</Text>
+        <Card testID="meal-photo-unavailable">
+          <Text variant="h3">{availability === 'disabled' ? 'KI-Fotoerkennung ist deaktiviert' : 'Gemini-Schlüssel fehlt'}</Text>
           <Text tone="secondary" style={{ marginTop: 6 }}>
             {availability === 'disabled'
-              ? 'Diese Installation läuft im kostenlosen Modus ohne KI-Dienst. Nutze Suche, Barcode oder Schnelleintrag.'
-              : availability === 'no_key'
-              ? 'Hinterlege einmalig deinen eigenen, kostenlosen Gemini-Schlüssel – dann schätzt die KI Mahlzeiten aus Fotos.'
-              : availability === 'no_backend'
-              ? 'Diese Installation ist ohne Server konfiguriert. Die Fotoanalyse läuft serverseitig (der API-Schlüssel liegt nie in der App).'
-              : 'Melde dich an bzw. erstelle ein Konto, um Mahlzeiten per Foto schätzen zu lassen.'}
+              ? 'Diese Installation läuft ohne KI. Nutze Suche, Barcode oder Schnelleintrag.'
+              : 'Hinterlege einmalig einen kostenlosen Gemini-Schlüssel – dann schätzt die KI Mahlzeiten aus Fotos.'}
           </Text>
-          {availability === 'no_account' && <Button title="Konto erstellen / anmelden" style={{ marginTop: spacing.md }} onPress={() => router.push('/auth')} />}
-          {availability === 'no_key' && <Button title="Schlüssel einrichten" style={{ marginTop: spacing.md }} onPress={() => router.push('/settings/ai')} />}
+          {availability === 'no_key' && <Button title="Schlüssel einrichten" style={{ marginTop: spacing.md }} onPress={() => router.push('/settings/ai')} testID="meal-photo-setup-key" />}
           <Button title="Stattdessen Schnelleintrag" variant="secondary" style={{ marginTop: spacing.sm }} onPress={() => router.replace(`/nutrition/quick?date=${date}&meal=${m}`)} />
         </Card>
       </Screen>

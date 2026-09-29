@@ -71,17 +71,13 @@ export function BodyFatCard({ withPhotos = false }: { withPhotos?: boolean }) {
         Schätzungen liegen typischerweise ±3–5 Prozentpunkte daneben – ideal, um den Verlauf zu verfolgen. Miss immer unter gleichen Bedingungen.
       </Text>
 
-      {withPhotos && ai !== 'disabled' && ai !== 'no_backend' && (
+      {withPhotos && ai !== 'disabled' && (
         <View style={{ marginTop: spacing.md, gap: 6 }} testID="bf-ai-section">
           <Text variant="smallMedium">Aus deinen Fotos (KI · Google Gemini)</Text>
-          {ai === 'no_account' ? (
-            <Text variant="small" tone="muted">
-              Melde dich an (Einstellungen → Konto), um die KI-Schätzung zu nutzen.
-            </Text>
-          ) : ai === 'no_key' ? (
+          {ai === 'no_key' ? (
             <Row style={{ justifyContent: 'space-between' }}>
               <Text variant="small" tone="muted" style={{ flex: 1 }}>
-                Hinterlege einmalig deinen kostenlosen Gemini-Schlüssel.
+                Hinterlege einmalig einen kostenlosen Gemini-Schlüssel.
               </Text>
               <Button title="Einrichten" size="sm" variant="secondary" testID="bf-setup-key" onPress={() => router.push('/settings/ai')} />
             </Row>
