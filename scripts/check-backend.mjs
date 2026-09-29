@@ -30,12 +30,15 @@ const checks = [
   ['Gemeinsamer KI-Schlüssel', 'rpc', 'get_shared_ai_key', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
 ];
 let missing = 0;
-for (const [label, kind, name, fix] of checks) {
-  const ok = await exists(kind, name);
+const results = [];
+for (const [label, kind, name, fix] of checks) results.push([label, await exists(kind, name), fix]);
+// empty database → only the complete setup.sql applies (the update needs the base schema)
+const baseMissing = results[0][1] === false;
+for (const [label, ok, fix] of results) {
   if (ok === true) notice(`✅ ${label}: vorhanden`);
   else if (ok === false) {
     missing++;
-    warn(`❌ ${label}: fehlt – bitte ${fix} im Supabase SQL Editor ausführen`);
+    warn(`❌ ${label}: fehlt – bitte ${baseMissing ? 'die komplette supabase/setup.sql' : fix} im Supabase SQL Editor ausführen`);
   } else warn(`⚠️ ${label}: ${ok}`);
 }
 try {
