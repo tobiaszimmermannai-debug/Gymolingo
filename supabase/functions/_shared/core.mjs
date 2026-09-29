@@ -1960,94 +1960,137 @@ function openTasks(st) {
   return tasks;
 }
 
-// src/cardio/energy.ts
-var CARDIO_LABELS_DE = { walk: "Spazieren", jog: "Joggen", run: "Laufen", ems: "EMS-Training" };
-var CARDIO_ICONS = { walk: "\u{1F6B6}", jog: "\u{1F3C3}", run: "\u{1F3C3}\u200D\u2642\uFE0F", ems: "\u26A1" };
-var INTENSITY_LABELS_DE = { light: "Leicht", medium: "Mittel", intense: "Intensiv" };
-var DEFAULT_DURATION_MIN = { walk: 30, jog: 30, run: 30, ems: 20 };
-var COUNTS_AS_TRAINING = { walk: false, jog: true, run: true, ems: true };
-var EMS_MET = { light: 3.5, medium: 4.5, intense: 5.5 };
-var WALK_TABLE = [
-  [3.2, 2.8],
-  [4, 3],
-  [4.8, 3.5],
-  [5.6, 4.3],
-  [6.4, 5],
-  [7.2, 7],
-  [8, 8.3]
-];
-var RUN_TABLE = [
-  [6.4, 6],
-  [8, 8.3],
-  [8.4, 9],
-  [9.7, 9.8],
-  [10.8, 10.5],
-  [11.3, 11],
-  [12.1, 11.5],
-  [12.9, 11.8],
-  [13.8, 12.3],
-  [14.5, 12.8],
-  [16.1, 14.5],
-  [17.7, 16],
-  [19.3, 19]
-];
-var DEFAULT_SPEED = {
-  walk: { light: 4, medium: 5, intense: 6 },
-  jog: { light: 7, medium: 8, intense: 9 },
-  run: { light: 9.5, medium: 11, intense: 13 }
+// src/cardio/catalog.ts
+var CATEGORY_LABELS_DE = {
+  endurance: "Ausdauer",
+  fitness: "Fitness & Kurse",
+  ball: "Ballsport & Schl\xE4ger",
+  outdoor: "Outdoor, Wasser & Winter",
+  household: "Haushalt",
+  garden: "Garten",
+  everyday: "Alltag & Freizeit"
 };
-function interpolate(table, x) {
-  if (x <= table[0][0]) return table[0][1] * (x / table[0][0]) ** 0.5;
-  for (let i = 1; i < table.length; i++) {
-    const [x1, y1] = table[i];
-    if (x <= x1) {
-      const [x0, y0] = table[i - 1];
-      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
-    }
-  }
-  const [xa, ya] = table[table.length - 2];
-  const [xb, yb] = table[table.length - 1];
-  return Math.min(23, yb + (yb - ya) / (xb - xa) * (x - xb));
+var NET_CATEGORIES = /* @__PURE__ */ new Set(["household", "garden", "everyday"]);
+var ACTIVITIES = [
+  // Ausdauer
+  { id: "walk", label: "Spazieren", icon: "\u{1F6B6}", category: "endurance", met: [3, 3.5, 4.3], levels: ["Gem\xFCtlich", "Normal", "Z\xFCgig"], training: false, duration: 30, distance: true, keywords: "gehen laufen spaziergang" },
+  { id: "jog", label: "Joggen", icon: "\u{1F3C3}", category: "endurance", met: [7, 8.3, 9], levels: ["Locker", "Normal", "Z\xFCgig"], training: true, duration: 30, distance: true, keywords: "laufen rennen" },
+  { id: "run", label: "Laufen", icon: "\u{1F3C3}\u200D\u2642\uFE0F", category: "endurance", met: [9.8, 11, 12.3], levels: ["Normal", "Schnell", "Sehr schnell"], training: true, duration: 30, distance: true, keywords: "rennen joggen sprint" },
+  { id: "hike", label: "Wandern", icon: "\u{1F97E}", category: "endurance", met: [4.5, 6, 7.8], levels: ["Flach", "H\xFCgelig", "Steil / mit Gep\xE4ck"], training: true, duration: 120, distance: true, keywords: "bergwandern trekking" },
+  { id: "nordic_walking", label: "Nordic Walking", icon: "\u{1F962}", category: "endurance", met: 4.8, training: true, duration: 45, distance: true, keywords: "st\xF6cke" },
+  { id: "bike", label: "Radfahren", icon: "\u{1F6B4}", category: "endurance", met: [4, 6.8, 8], levels: ["Gem\xFCtlich (< 16 km/h)", "Z\xFCgig (16\u201319 km/h)", "Schnell (19\u201322 km/h)"], training: true, duration: 45, distance: true, keywords: "fahrrad rennrad pendeln" },
+  { id: "ebike", label: "E-Bike", icon: "\u{1F6B2}", category: "endurance", met: [3, 4, 5], training: true, duration: 45, distance: true, keywords: "pedelec fahrrad" },
+  { id: "mtb", label: "Mountainbike", icon: "\u{1F6B5}", category: "endurance", met: [6.8, 8.5, 14], levels: ["Gem\xFCtlich", "Normal", "Bergauf / hart"], training: true, duration: 60, distance: true, keywords: "mtb gravel" },
+  { id: "spinning", label: "Indoor-Cycling / Spinning", icon: "\u{1F6B4}\u200D\u2640\uFE0F", category: "endurance", met: [4.8, 8.5, 11], levels: ["Locker", "Kurs", "Hart"], training: true, duration: 45, keywords: "ergometer heimtrainer" },
+  { id: "swim", label: "Schwimmen", icon: "\u{1F3CA}", category: "endurance", met: [5.8, 8.3, 9.8], levels: ["Gem\xFCtlich", "Z\xFCgig", "Schnell"], training: true, duration: 45, distance: true, keywords: "kraulen brust bahnen" },
+  { id: "aqua", label: "Aquafitness", icon: "\u{1F30A}", category: "endurance", met: 5.5, training: true, duration: 45, keywords: "aqua jogging wassergymnastik" },
+  { id: "rowing", label: "Rudern / Ruderger\xE4t", icon: "\u{1F6A3}", category: "endurance", met: [4.8, 7, 8.5], training: true, duration: 30, keywords: "ergometer" },
+  { id: "crosstrainer", label: "Crosstrainer", icon: "\u{1F3C3}\u200D\u2640\uFE0F", category: "endurance", met: [4, 5, 6.5], training: true, duration: 30, keywords: "ellipsentrainer" },
+  { id: "stepper", label: "Stepper / Stairmaster", icon: "\u{1FA9C}", category: "endurance", met: 9, training: true, duration: 20 },
+  { id: "jump_rope", label: "Seilspringen", icon: "\u{1FAA2}", category: "endurance", met: [8.8, 11.8, 12.3], levels: ["Langsam", "Mittel", "Schnell"], training: true, duration: 15 },
+  { id: "inline", label: "Inline-Skaten", icon: "\u{1F6FC}", category: "endurance", met: 7.5, training: true, duration: 45, distance: true, keywords: "rollschuh skaten" },
+  { id: "xc_ski", label: "Skilanglauf", icon: "\u26F7\uFE0F", category: "endurance", met: [6.8, 9, 12.5], training: true, duration: 60, distance: true, keywords: "langlauf loipe" },
+  // Fitness & Kurse
+  { id: "ems", label: "EMS-Training", icon: "\u26A1", category: "fitness", met: [3.5, 4.5, 5.5], levels: ["Leicht", "Mittel", "Intensiv"], training: true, duration: 20, keywords: "strom bodystreet" },
+  { id: "hiit", label: "HIIT / Zirkel / CrossFit", icon: "\u{1F525}", category: "fitness", met: [4.3, 6, 8], training: true, duration: 30, keywords: "functional bootcamp kettlebell tabata" },
+  { id: "yoga", label: "Yoga", icon: "\u{1F9D8}", category: "fitness", met: [2.5, 3.3, 4], levels: ["Hatha / Yin", "Flow", "Power"], training: true, duration: 60 },
+  { id: "pilates", label: "Pilates", icon: "\u{1F938}\u200D\u2640\uFE0F", category: "fitness", met: 3, training: true, duration: 45 },
+  { id: "gymnastics", label: "Gymnastik / R\xFCckenkurs", icon: "\u{1F646}", category: "fitness", met: 3.8, training: true, duration: 45, keywords: "reha funktionsgymnastik" },
+  { id: "stretching", label: "Stretching / Mobility", icon: "\u{1F938}", category: "fitness", met: 2.3, training: false, duration: 20, keywords: "dehnen faszien" },
+  { id: "aerobic", label: "Aerobic / Step", icon: "\u{1F45F}", category: "fitness", met: [5, 7.3, 9.5], training: true, duration: 45 },
+  { id: "zumba", label: "Zumba / Dance-Fitness", icon: "\u{1F483}", category: "fitness", met: 6.5, training: true, duration: 60 },
+  { id: "martial_arts", label: "Kampfsport", icon: "\u{1F94B}", category: "fitness", met: [5.3, 7.8, 10.3], training: true, duration: 60, keywords: "karate judo kickboxen taekwondo mma jiu jitsu" },
+  { id: "boxing", label: "Boxen", icon: "\u{1F94A}", category: "fitness", met: [5.5, 7.8, 12.8], levels: ["Sandsack", "Sparring", "Kampf"], training: true, duration: 45 },
+  { id: "climbing", label: "Klettern / Bouldern", icon: "\u{1F9D7}", category: "fitness", met: [5, 5.8, 7.5], training: true, duration: 90, keywords: "boulder kletterhalle" },
+  { id: "dance", label: "Tanzen", icon: "\u{1F57A}", category: "fitness", met: [3, 5.5, 7.8], levels: ["Langsam", "Tanzkurs / schnell", "Party / Disco"], training: true, duration: 60, keywords: "salsa standard disco club" },
+  { id: "trampoline", label: "Trampolin", icon: "\u{1F998}", category: "fitness", met: [3.5, 4.5, 6], training: true, duration: 30 },
+  // Ballsport & Schläger
+  { id: "soccer", label: "Fu\xDFball", icon: "\u26BD", category: "ball", met: [7, 8.5, 10], levels: ["Freizeit", "Training", "Spiel"], training: true, duration: 90, keywords: "kicken futsal" },
+  { id: "basketball", label: "Basketball", icon: "\u{1F3C0}", category: "ball", met: [4.5, 6.5, 8], levels: ["K\xF6rbe werfen", "Training", "Spiel"], training: true, duration: 60 },
+  { id: "volleyball", label: "Volleyball", icon: "\u{1F3D0}", category: "ball", met: [3, 4, 8], levels: ["Freizeit", "Verein", "Beach"], training: true, duration: 60 },
+  { id: "handball", label: "Handball", icon: "\u{1F93E}", category: "ball", met: [8, 10, 12], levels: ["Training", "Spiel", "Wettkampf"], training: true, duration: 60 },
+  { id: "tennis", label: "Tennis", icon: "\u{1F3BE}", category: "ball", met: [6, 7.3, 8], levels: ["Doppel", "Allgemein", "Einzel"], training: true, duration: 60 },
+  { id: "padel", label: "Padel", icon: "\u{1F3D3}", category: "ball", met: [5, 6, 7.3], training: true, duration: 60 },
+  { id: "badminton", label: "Badminton", icon: "\u{1F3F8}", category: "ball", met: [4.5, 5.5, 7], levels: ["Locker", "Freizeit", "Wettkampf"], training: true, duration: 60, keywords: "federball" },
+  { id: "table_tennis", label: "Tischtennis", icon: "\u{1F3D3}", category: "ball", met: [3, 4, 5.5], training: true, duration: 60, keywords: "ping pong" },
+  { id: "squash", label: "Squash", icon: "\u{1F7E1}", category: "ball", met: [7.3, 9, 12], training: true, duration: 45 },
+  { id: "golf", label: "Golf", icon: "\u26F3", category: "ball", met: [3.5, 4.3, 4.8], levels: ["Mit Cart", "Zu Fu\xDF mit Trolley", "Zu Fu\xDF mit Tasche"], training: true, duration: 180 },
+  { id: "ice_hockey", label: "Eishockey", icon: "\u{1F3D2}", category: "ball", met: 8, training: true, duration: 60 },
+  { id: "hockey", label: "Hockey", icon: "\u{1F3D1}", category: "ball", met: 7.8, training: true, duration: 60 },
+  { id: "rugby", label: "Rugby", icon: "\u{1F3C9}", category: "ball", met: 8.3, training: true, duration: 80 },
+  { id: "american_football", label: "American Football", icon: "\u{1F3C8}", category: "ball", met: 8, training: true, duration: 90 },
+  { id: "frisbee", label: "Frisbee", icon: "\u{1F94F}", category: "ball", met: [3, 5, 8], levels: ["Werfen", "Spiel", "Ultimate"], training: false, duration: 45 },
+  { id: "bowling", label: "Bowling / Kegeln", icon: "\u{1F3B3}", category: "ball", met: 3.8, training: false, duration: 90 },
+  { id: "darts", label: "Darts", icon: "\u{1F3AF}", category: "ball", met: 2.5, training: false, duration: 60 },
+  { id: "billiards", label: "Billard", icon: "\u{1F3B1}", category: "ball", met: 2.5, training: false, duration: 60 },
+  // Outdoor, Wasser & Winter
+  { id: "sup", label: "Stand-Up-Paddling", icon: "\u{1F3C4}\u200D\u2640\uFE0F", category: "outdoor", met: [4, 6, 8], training: true, duration: 60, keywords: "sup paddeln" },
+  { id: "kayak", label: "Kanu / Kajak", icon: "\u{1F6F6}", category: "outdoor", met: [3.5, 5, 8], training: true, duration: 60, keywords: "paddeln" },
+  { id: "surf", label: "Surfen", icon: "\u{1F3C4}", category: "outdoor", met: [3, 5, 7], training: true, duration: 90, keywords: "wellenreiten kitesurfen windsurfen" },
+  { id: "sailing", label: "Segeln", icon: "\u26F5", category: "outdoor", met: 3, training: false, duration: 120 },
+  { id: "ski", label: "Ski alpin", icon: "\u26F7\uFE0F", category: "outdoor", met: [4.3, 5.3, 8], training: true, duration: 180, keywords: "skifahren piste" },
+  { id: "snowboard", label: "Snowboard", icon: "\u{1F3C2}", category: "outdoor", met: [4.3, 5.3, 8], training: true, duration: 180 },
+  { id: "ice_skating", label: "Eislaufen", icon: "\u26F8\uFE0F", category: "outdoor", met: [5.5, 7, 9], training: true, duration: 60, keywords: "schlittschuh" },
+  { id: "sledding", label: "Rodeln", icon: "\u{1F6F7}", category: "outdoor", met: 7, training: false, duration: 60, keywords: "schlitten" },
+  { id: "snowshoe", label: "Schneeschuhwandern", icon: "\u{1F3D4}\uFE0F", category: "outdoor", met: [5.3, 6.5, 8], training: true, duration: 120 },
+  { id: "riding", label: "Reiten", icon: "\u{1F3C7}", category: "outdoor", met: [3.8, 5.5, 7.3], levels: ["Schritt", "Trab", "Galopp"], training: true, duration: 60, keywords: "pferd" },
+  { id: "fishing", label: "Angeln", icon: "\u{1F3A3}", category: "outdoor", met: [2, 3.5, 4], training: false, duration: 180 },
+  // Haushalt
+  { id: "vacuuming", label: "Staubsaugen", icon: "\u{1F9F9}", category: "household", met: 3.3, training: false, duration: 20, keywords: "saugen" },
+  { id: "cleaning", label: "Putzen", icon: "\u{1F9FD}", category: "household", met: [2.3, 3.3, 3.8], levels: ["Abstauben", "Normal", "Grundputz / B\xF6den schrubben"], training: false, duration: 30, keywords: "bad k\xFCche wischen" },
+  { id: "windows", label: "Fenster putzen", icon: "\u{1FA9F}", category: "household", met: 3.2, training: false, duration: 45 },
+  { id: "ironing", label: "B\xFCgeln", icon: "\u{1F454}", category: "household", met: 1.8, training: false, duration: 30 },
+  { id: "laundry", label: "W\xE4sche waschen / aufh\xE4ngen", icon: "\u{1F9FA}", category: "household", met: 2, training: false, duration: 20, keywords: "w\xE4sche falten" },
+  { id: "cooking", label: "Kochen", icon: "\u{1F373}", category: "household", met: [2, 2.5, 3.5], levels: ["Aufw\xE4rmen", "Kochen", "Gro\xDFes Essen / Meal Prep"], training: false, duration: 45, keywords: "backen meal prep" },
+  { id: "dishes", label: "Abwasch / K\xFCche aufr\xE4umen", icon: "\u{1F37D}\uFE0F", category: "household", met: [1.8, 2.3, 3.3], training: false, duration: 20, keywords: "sp\xFClen sp\xFClmaschine" },
+  { id: "tidying", label: "Aufr\xE4umen", icon: "\u{1F9F8}", category: "household", met: [2, 2.5, 3.3], training: false, duration: 30 },
+  { id: "bed_making", label: "Betten machen / beziehen", icon: "\u{1F6CF}\uFE0F", category: "household", met: 3.3, training: false, duration: 15 },
+  { id: "shopping", label: "Einkaufen", icon: "\u{1F6D2}", category: "household", met: [2.3, 2.3, 3], levels: ["Mit Wagen", "Normal", "Shoppingbummel"], training: false, duration: 45, keywords: "supermarkt shopping bummeln" },
+  { id: "carrying", label: "Tragen / Umzug", icon: "\u{1F4E6}", category: "household", met: [3.5, 5.8, 7.5], levels: ["Eink\xE4ufe tragen", "Kisten tragen", "M\xF6bel / Treppen"], training: false, duration: 60, keywords: "umziehen schleppen m\xF6bel" },
+  { id: "diy", label: "Heimwerken / Renovieren", icon: "\u{1F528}", category: "household", met: [2.3, 3.3, 4.5], levels: ["Kleinkram", "Streichen / Bohren", "Schwere Arbeiten"], training: false, duration: 60, keywords: "streichen tapezieren bohren renovieren" },
+  { id: "car_wash", label: "Auto waschen / putzen", icon: "\u{1F697}", category: "household", met: 3.5, training: false, duration: 45 },
+  // Garten
+  { id: "gardening", label: "Gartenarbeit", icon: "\u{1F331}", category: "garden", met: [2.3, 3.8, 4.5], training: false, duration: 60, keywords: "pflanzen umgraben beet" },
+  { id: "mowing", label: "Rasen m\xE4hen", icon: "\u{1F69C}", category: "garden", met: [2.5, 5, 6], levels: ["Aufsitzm\xE4her", "Motorm\xE4her", "Handm\xE4her"], training: false, duration: 45 },
+  { id: "weeding", label: "Unkraut j\xE4ten", icon: "\u{1F33F}", category: "garden", met: 3.5, training: false, duration: 30 },
+  { id: "raking", label: "Laub rechen", icon: "\u{1F342}", category: "garden", met: 3.8, training: false, duration: 30, keywords: "laub harken" },
+  { id: "hedge", label: "Hecke / Str\xE4ucher schneiden", icon: "\u2702\uFE0F", category: "garden", met: [3.5, 4, 4.5], training: false, duration: 45 },
+  { id: "snow_shoveling", label: "Schnee schippen", icon: "\u2744\uFE0F", category: "garden", met: [3.5, 5.3, 7.5], training: false, duration: 30, keywords: "schnee r\xE4umen" },
+  { id: "wood", label: "Holz hacken / stapeln", icon: "\u{1FA93}", category: "garden", met: [3, 4.5, 6.3], training: false, duration: 45, keywords: "brennholz" },
+  // Alltag & Freizeit
+  { id: "stairs", label: "Treppensteigen", icon: "\u{1FA9C}", category: "everyday", met: [4, 6, 8.8], levels: ["Langsam", "Normal", "Schnell"], training: false, duration: 10, keywords: "treppe stufen" },
+  { id: "dog_walk", label: "Gassi gehen", icon: "\u{1F415}", category: "everyday", met: 3, training: false, duration: 30, keywords: "hund" },
+  { id: "stroller", label: "Kinderwagen schieben", icon: "\u{1F476}", category: "everyday", met: [2.5, 3.5, 4], training: false, duration: 30, keywords: "buggy baby" },
+  { id: "kids_play", label: "Mit Kindern spielen", icon: "\u{1F9D2}", category: "everyday", met: [2.2, 3.5, 5.8], levels: ["Ruhig", "Aktiv", "Toben / Fangen"], training: false, duration: 30, keywords: "spielplatz" },
+  { id: "sex", label: "Sex", icon: "\u2764\uFE0F", category: "everyday", met: [1.8, 2.8, 3.5], levels: ["Entspannt", "Normal", "Leidenschaftlich"], training: false, duration: 25, keywords: "liebe intim schlafzimmer" },
+  { id: "standing_work", label: "Arbeiten im Stehen", icon: "\u{1F9CD}", category: "everyday", met: [1.8, 2.3, 3], training: false, duration: 120, keywords: "stehschreibtisch verkauf kasse" },
+  { id: "manual_work", label: "K\xF6rperliche Arbeit", icon: "\u{1F477}", category: "everyday", met: [3, 4, 6], levels: ["Leicht (Lager, Pflege)", "Mittel (Handwerk)", "Schwer (Bau)"], training: false, duration: 240, keywords: "job bau handwerk pflege lager" },
+  { id: "music", label: "Musizieren", icon: "\u{1F941}", category: "everyday", met: [2, 2.8, 3.8], levels: ["Gitarre / Klavier", "Im Stehen", "Schlagzeug"], training: false, duration: 60, keywords: "instrument band" },
+  { id: "active_gaming", label: "Active Gaming / VR", icon: "\u{1F3AE}", category: "everyday", met: [2.3, 3.8, 6], training: false, duration: 30, keywords: "wii switch vr beat saber" },
+  { id: "other", label: "Sonstige Aktivit\xE4t", icon: "\u{1F3C5}", category: "everyday", met: [2.5, 4, 6], training: false, duration: 30, keywords: "eigene andere" }
+];
+var ACTIVITY_MAP = Object.fromEntries(ACTIVITIES.map((a) => [a.id, a]));
+var UNKNOWN = { id: "unknown", label: "Aktivit\xE4t", icon: "\u{1F3C5}", category: "fitness", met: 4, training: false, duration: 30 };
+var activityDef = (id) => ACTIVITY_MAP[id] ?? UNKNOWN;
+var activityLabel = (id) => activityDef(id).label;
+var activityIcon = (id) => activityDef(id).icon;
+var countsAsTraining = (id) => activityDef(id).training;
+var hasLevels = (id) => Array.isArray(activityDef(id).met);
+var DEFAULT_LEVELS = ["Leicht", "Mittel", "Intensiv"];
+var LEVEL_INDEX = { light: 0, medium: 1, intense: 2 };
+function levelLabel(id, intensity) {
+  return (activityDef(id).levels ?? DEFAULT_LEVELS)[LEVEL_INDEX[intensity]];
 }
-function speedKmh(durationMin, distanceKm) {
-  if (!distanceKm || distanceKm <= 0 || !durationMin || durationMin <= 0) return null;
-  return distanceKm / (durationMin / 60);
+function catalogMet(id, intensity) {
+  const m = activityDef(id).met;
+  return Array.isArray(m) ? m[LEVEL_INDEX[intensity]] : m;
 }
-function formatPace(durationMin, distanceKm) {
-  if (!distanceKm || distanceKm <= 0 || !durationMin) return null;
-  const pace = durationMin / distanceKm;
-  const m = Math.floor(pace);
-  const s = Math.round((pace - m) * 60);
-  return s === 60 ? `${m + 1}:00` : `${m}:${String(s).padStart(2, "0")}`;
-}
-function cardioMet(activity, intensity, durationMin, distanceKm) {
-  if (activity === "ems") return EMS_MET[intensity];
-  const speed = speedKmh(durationMin, distanceKm) ?? DEFAULT_SPEED[activity][intensity];
-  return speed >= 7.5 && activity === "walk" ? interpolate(RUN_TABLE, speed) : activity !== "walk" && speed < 6.4 ? interpolate(WALK_TABLE, speed) : interpolate(activity === "walk" ? WALK_TABLE : RUN_TABLE, speed);
-}
-function cardioKcal(s, weightKg) {
-  if (!(s.duration_min > 0) || !(weightKg > 0)) return 0;
-  return Math.round(cardioMet(s.activity, s.intensity, s.duration_min, s.distance_km) * weightKg * (s.duration_min / 60));
-}
-function cardioSummary(sessions, from, to) {
-  const out = { sessions: 0, minutes: 0, km: 0, kcal: 0, byActivity: {} };
-  for (const s of sessions) {
-    if (s.deleted || s.date < from || s.date > to) continue;
-    out.sessions++;
-    out.minutes += s.duration_min;
-    out.km += s.distance_km ?? 0;
-    out.kcal += s.kcal;
-    out.byActivity[s.activity] = (out.byActivity[s.activity] ?? 0) + 1;
-  }
-  out.km = Math.round(out.km * 10) / 10;
-  return out;
-}
-function burnedOn(date, sessions) {
-  return sessions.reduce((a, s) => !s.deleted && s.date === date ? a + s.kcal : a, 0);
-}
-function withExerciseCalories(profile, burnedKcal) {
-  if (!profile.add_exercise_calories || burnedKcal <= 0) return profile;
-  return { ...profile, calorie_target: profile.calorie_target + burnedKcal, carbs_target_g: Math.round(profile.carbs_target_g + burnedKcal / 4) };
+var isNetActivity = (id) => NET_CATEGORIES.has(activityDef(id).category);
+var fold = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
+function searchActivities(query) {
+  const q = fold(query.trim());
+  if (!q) return ACTIVITIES;
+  return ACTIVITIES.filter((a) => fold(`${a.label} ${a.keywords ?? ""}`).includes(q));
 }
 
 // src/data/aggregate.ts
@@ -2070,7 +2113,7 @@ function stepsByDate(entries) {
 }
 function trainedDates(sessions, cardio = []) {
   const out = new Set(sessions.filter((s) => !s.deleted && s.status === "completed").map((s) => s.date));
-  for (const c of cardio) if (!c.deleted && COUNTS_AS_TRAINING[c.activity]) out.add(c.date);
+  for (const c of cardio) if (!c.deleted && countsAsTraining(c.activity)) out.add(c.date);
   return out;
 }
 function buildDailyActivities(data, from, to) {
@@ -2119,7 +2162,7 @@ function buildDailyActivities(data, from, to) {
   for (const c of data.cardio ?? []) {
     if (c.deleted || !inRange(c.date)) continue;
     const a = get(c.date);
-    a.cardio += 1;
+    if (countsAsTraining(c.activity)) a.cardio += 1;
     a.cardioKcal += c.kcal;
   }
   for (const c of data.checkins) if (!c.deleted && inRange(c.date)) get(c.date).checkin = true;
@@ -2164,6 +2207,111 @@ function daysBetween(from, to) {
   return dateRange(from, to);
 }
 
+// src/cardio/energy.ts
+var INTENSITY_LABELS_DE = { light: "Leicht", medium: "Mittel", intense: "Intensiv" };
+var EMS_MET = { light: 3.5, medium: 4.5, intense: 5.5 };
+var WALK_TABLE = [
+  [3.2, 2.8],
+  [4, 3],
+  [4.8, 3.5],
+  [5.6, 4.3],
+  [6.4, 5],
+  [7.2, 7],
+  [8, 8.3]
+];
+var RUN_TABLE = [
+  [6.4, 6],
+  [8, 8.3],
+  [8.4, 9],
+  [9.7, 9.8],
+  [10.8, 10.5],
+  [11.3, 11],
+  [12.1, 11.5],
+  [12.9, 11.8],
+  [13.8, 12.3],
+  [14.5, 12.8],
+  [16.1, 14.5],
+  [17.7, 16],
+  [19.3, 19]
+];
+var BIKE_STEPS = [
+  [16, 4],
+  [19.3, 6.8],
+  [22.5, 8],
+  [25.7, 10],
+  [30.6, 12]
+];
+var SPEED_BASED = ["walk", "jog", "run"];
+var isSpeedBased = (a) => SPEED_BASED.includes(a);
+var DEFAULT_SPEED = {
+  walk: { light: 4, medium: 5, intense: 6 },
+  jog: { light: 7, medium: 8, intense: 9 },
+  run: { light: 9.5, medium: 11, intense: 13 }
+};
+function interpolate(table, x) {
+  if (x <= table[0][0]) return table[0][1] * (x / table[0][0]) ** 0.5;
+  for (let i = 1; i < table.length; i++) {
+    const [x1, y1] = table[i];
+    if (x <= x1) {
+      const [x0, y0] = table[i - 1];
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+  }
+  const [xa, ya] = table[table.length - 2];
+  const [xb, yb] = table[table.length - 1];
+  return Math.min(23, yb + (yb - ya) / (xb - xa) * (x - xb));
+}
+function speedKmh(durationMin, distanceKm) {
+  if (!distanceKm || distanceKm <= 0 || !durationMin || durationMin <= 0) return null;
+  return distanceKm / (durationMin / 60);
+}
+function formatPace(durationMin, distanceKm) {
+  if (!distanceKm || distanceKm <= 0 || !durationMin) return null;
+  const pace = durationMin / distanceKm;
+  const m = Math.floor(pace);
+  const s = Math.round((pace - m) * 60);
+  return s === 60 ? `${m + 1}:00` : `${m}:${String(s).padStart(2, "0")}`;
+}
+function cardioMet(activity, intensity, durationMin, distanceKm) {
+  if (activity === "ems") return EMS_MET[intensity];
+  if (activity === "bike") {
+    const v = speedKmh(durationMin, distanceKm);
+    return v === null ? catalogMet("bike", intensity) : BIKE_STEPS.find(([max]) => v < max)?.[1] ?? 15.8;
+  }
+  if (!isSpeedBased(activity)) return catalogMet(activity, intensity);
+  const speed = speedKmh(durationMin, distanceKm) ?? DEFAULT_SPEED[activity][intensity];
+  return speed >= 7.5 && activity === "walk" ? interpolate(RUN_TABLE, speed) : activity !== "walk" && speed < 6.4 ? interpolate(WALK_TABLE, speed) : interpolate(activity === "walk" ? WALK_TABLE : RUN_TABLE, speed);
+}
+function countedMet(activity, intensity, durationMin, distanceKm) {
+  const met = cardioMet(activity, intensity, durationMin, distanceKm);
+  return isNetActivity(activity) ? Math.max(0, met - 1) : met;
+}
+function cardioKcal(s, weightKg) {
+  if (!(s.duration_min > 0) || !(weightKg > 0)) return 0;
+  return Math.round(countedMet(s.activity, s.intensity, s.duration_min, s.distance_km) * weightKg * (s.duration_min / 60));
+}
+var kcalPer30Min = (activity, weightKg) => cardioKcal({ activity, intensity: "medium", duration_min: 30, distance_km: null }, weightKg);
+function cardioSummary(sessions, from, to) {
+  const out = { sessions: 0, minutes: 0, km: 0, kcal: 0, byActivity: {} };
+  for (const s of sessions) {
+    if (s.deleted || s.date < from || s.date > to) continue;
+    out.sessions++;
+    out.minutes += s.duration_min;
+    out.km += s.distance_km ?? 0;
+    out.kcal += s.kcal;
+    out.byActivity[s.activity] = (out.byActivity[s.activity] ?? 0) + 1;
+  }
+  out.km = Math.round(out.km * 10) / 10;
+  return out;
+}
+function burnedOn(date, sessions) {
+  return sessions.reduce((a, s) => !s.deleted && s.date === date ? a + s.kcal : a, 0);
+}
+function withExerciseCalories(profile, burnedKcal) {
+  if (!profile.add_exercise_calories || burnedKcal <= 0) return profile;
+  return { ...profile, calorie_target: profile.calorie_target + burnedKcal, carbs_target_g: Math.round(profile.carbs_target_g + burnedKcal / 4) };
+}
+
 // src/coach/report.ts
 var avg2 = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 var r0 = (n) => n === null ? null : Math.round(n);
@@ -2192,7 +2340,7 @@ function buildWeeklyReport(data, weekStartDate, opts = {}) {
   const plateaus = [...trainedThisWeek].filter((id) => detectPlateau(exerciseHistory(id, data.sessions, data.sets).filter((h) => h.date <= we))).map(name);
   const done = data.sessions.filter((s) => !s.deleted && s.status === "completed" && s.date >= ws && s.date <= we);
   const cardioWeek = (data.cardio ?? []).filter((c) => !c.deleted && c.date >= ws && c.date <= we);
-  const cardioTrainings = cardioWeek.filter((c) => COUNTS_AS_TRAINING[c.activity]).length;
+  const cardioTrainings = cardioWeek.filter((c) => countsAsTraining(c.activity)).length;
   const cs = cardioSummary(cardioWeek, ws, we);
   const schedule = {
     type: p.schedule_type,
@@ -2234,7 +2382,7 @@ function buildWeeklyReport(data, weekStartDate, opts = {}) {
       volumeKg: volume(ws, we),
       volumePrevKg: volume(prevWs, prevWe),
       setsPerMuscle: spmLabeled,
-      cardio: cs.sessions ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k], v])) } : void 0
+      cardio: cs.sessions ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [activityLabel(k), v])) } : void 0
     },
     nutrition: {
       daysLogged: logged.length,
@@ -2430,7 +2578,7 @@ function renderWeeklyReportText(s) {
   const c = s.consistency;
   sections.push({
     heading: "2. Trainingskonsistenz",
-    body: `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ""}. ${c.workingSets} Arbeitss\xE4tze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).` + (c.cardio ? ` Ausdauer & EMS: ${Object.entries(c.cardio.byActivity).map(([k, v]) => `${k} ${v}\xD7`).join(", ")}, ${c.cardio.minutes} min${c.cardio.km ? `, ${formatNumberDE(c.cardio.km)} km` : ""}, ca. ${formatNumberDE(c.cardio.kcal, 0)} kcal.` : "")
+    body: `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ""}. ${c.workingSets} Arbeitss\xE4tze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).` + (c.cardio ? ` Aktivit\xE4ten: ${Object.entries(c.cardio.byActivity).map(([k, v]) => `${k} ${v}\xD7`).join(", ")}, ${c.cardio.minutes} min${c.cardio.km ? `, ${formatNumberDE(c.cardio.km)} km` : ""}, ca. ${formatNumberDE(c.cardio.kcal, 0)} kcal.` : "")
   });
   const n = s.nutrition;
   sections.push({
@@ -2548,8 +2696,8 @@ function buildCoachContext(data, today, lookup, birthYear, todayPlan = null) {
         minutes: c.minutes,
         km: c.km,
         kcal: c.kcal,
-        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k], v])),
-        last: last ? `${last.date}: ${CARDIO_LABELS_DE[last.activity]} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ""}${last.activity === "ems" ? ` (${last.intensity})` : ""}, ${last.kcal} kcal` : null
+        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [activityLabel(k), v])),
+        last: last ? `${last.date}: ${activityLabel(last.activity)} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ""}${hasLevels(last.activity) && !last.distance_km ? ` (${levelLabel(last.activity, last.intensity)})` : ""}, ${last.kcal} kcal` : null
       };
     })(),
     key_lifts,
@@ -2601,15 +2749,15 @@ function answerOffline(ctx, question) {
     if (lift.plateau) lines.push("Seit einigen Einheiten stagniert die Leistung \u2013 eine leichtere Woche oder ein anderer Wiederholungsbereich kann helfen.");
     return lines.join("\n");
   }
-  if (has("lauf", "jogg", "renn", "ems", "cardio", "ausdauer", "spazier", "verbrannt", "verbrauch")) {
+  if (has("lauf", "jogg", "renn", "ems", "cardio", "ausdauer", "spazier", "verbrannt", "verbrauch", "aktivit", "sport", "rad", "schwimm", "fussball", "fu\xDFball")) {
     const c = ctx.cardio_28_days;
-    if (!c.sessions) return "In den letzten 4 Wochen ist noch kein Lauf-, Spazier- oder EMS-Training eingetragen. Unter Training \u2192 \u201EAusdauer & EMS\u201C tr\xE4gst du es in 10 Sekunden ein \u2013 der Kalorienverbrauch wird automatisch berechnet.";
+    if (!c.sessions) return "In den letzten 4 Wochen ist noch keine Aktivit\xE4t eingetragen. Unter Training \u2192 \u201EAktivit\xE4ten & Sport\u201C findest du \xFCber 80 Sportarten und Alltagsaktivit\xE4ten \u2013 der Kalorienverbrauch wird automatisch berechnet.";
     lines.push(`Letzte 4 Wochen: ${c.sessions} Einheiten, ${c.minutes} Minuten${c.km ? `, ${formatNumberDE(c.km)} km` : ""}, ca. ${formatNumberDE(c.kcal, 0)} kcal verbrannt.`);
     const parts = Object.entries(c.by_activity).map(([k, v]) => `${k} ${v}\xD7`);
     if (parts.length) lines.push(`Verteilung: ${parts.join(", ")}.`);
     if (c.last) lines.push(`Zuletzt: ${c.last}.`);
     if (ctx.today_status.cardio_kcal_today) lines.push(`Heute bisher: ${ctx.today_status.cardio_kcal_today} kcal durch Aktivit\xE4t.`);
-    lines.push("Die Werte sind Sch\xE4tzungen (MET-Methode, EMS nach Studienwerten) \u2013 ideal f\xFCr den Verlauf.");
+    lines.push("Die Werte sind Sch\xE4tzungen (MET-Methode nach dem Compendium of Physical Activities, EMS nach Studienwerten) \u2013 ideal f\xFCr den Verlauf.");
     return lines.join("\n");
   }
   if (has("protein", "eiweiss")) {
@@ -3497,18 +3645,17 @@ function cleanStatusText(text) {
   return Array.from(text.replace(/\s+/g, " ").trim()).slice(0, STATUS_MAX_TEXT).join("");
 }
 export {
+  ACTIVITIES,
   ACTIVITY_FACTORS,
   ACTIVITY_LABELS_DE,
+  ACTIVITY_MAP,
   ALLERGEN_LABELS_DE,
   BADGES,
   BADGE_MAP,
   BODY_FAT_SCHEMA,
   BODY_FAT_SYSTEM,
-  CARDIO_ICONS,
-  CARDIO_LABELS_DE,
+  CATEGORY_LABELS_DE,
   COACH_SYSTEM_PROMPT,
-  COUNTS_AS_TRAINING,
-  DEFAULT_DURATION_MIN,
   DEFAULT_REMINDER_SETTINGS,
   EMPTY_TOTALS,
   EMS_MET,
@@ -3529,6 +3676,7 @@ export {
   MEAL_PHOTO_SYSTEM,
   MUSCLE_GROUP_BUCKETS,
   MUSCLE_LABELS_DE,
+  NET_CATEGORIES,
   OFF_BASE,
   OFF_USER_AGENT,
   PERIOD_DAYS,
@@ -3544,6 +3692,9 @@ export {
   WEEKDAY_SHORT_DE,
   WEEKLY_REPORT_PROMPT,
   XP_RULES,
+  activityDef,
+  activityIcon,
+  activityLabel,
   adaptiveCalorieAdjustment,
   addDays,
   ageFromBirthYear,
@@ -3566,12 +3717,15 @@ export {
   cardioKcal,
   cardioMet,
   cardioSummary,
+  catalogMet,
   cleanStatusText,
   completedSessions,
   computeAllStreaks,
   computeDailyStreak,
   computePersonalRecords,
   computeTrainingStreak,
+  countedMet,
+  countsAsTraining,
   dailyBodyFat,
   dailyWeights,
   dateRange,
@@ -3605,9 +3759,11 @@ export {
   geminiValidateKey,
   generateDemoData,
   generatePlanTemplate,
+  hasLevels,
   isBetween,
   isCaloriesOnTarget,
   isDayLogged,
+  isNetActivity,
   isPaused,
   isPlannedTrainingDay,
   isProteinHit,
@@ -3617,9 +3773,11 @@ export {
   isWorkingSet,
   isoWeekNumber,
   kcalFromMacros,
+  kcalPer30Min,
   lastPerformedSets,
   latestNavyBodyFat,
   levelFromXp,
+  levelLabel,
   linearSlope,
   looksLikeGeminiKey,
   mealsByDate,
@@ -3651,6 +3809,7 @@ export {
   roundToIncrement,
   sanitizeBodyFat,
   sanitizeMealItems,
+  searchActivities,
   searchExercises,
   searchFoods,
   searchOff,

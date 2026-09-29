@@ -36,6 +36,9 @@ test('register from guest mode, sync and restore on a second device', async ({ p
   await page.goto('/body/weight');
   await page.getByTestId('weight-input').fill('70,5');
   await page.getByTestId('save-weight').click();
+  // a catalog activity (not just walk/jog/run/EMS) syncs too
+  await page.goto('/cardio/new?activity=padel');
+  await page.getByTestId('cardio-save').click();
   await syncNow(page);
   await expect(page.getByTestId('account-email')).toHaveText(email);
 
@@ -49,6 +52,8 @@ test('register from guest mode, sync and restore on a second device', async ({ p
   await expect(b.getByTestId('home-screen')).toBeVisible();
   await expect(b.getByText('Anna 👋', { exact: false })).toBeVisible();
   await expect(b.getByTestId('home-weight-card')).toContainText('70,5 kg');
+  await b.getByTestId('tab-training').click();
+  await expect(b.getByTestId('cardio-entry')).toContainText('Padel');
 
   // edits made offline-first on device B propagate to device A
   await b.goto('/nutrition/quick?meal=dinner');

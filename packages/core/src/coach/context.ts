@@ -9,7 +9,8 @@ import type { UserData } from '../data/aggregate';
 import { buildDailyActivities } from '../data/aggregate';
 import { weightSummary } from '../body/trend';
 import { dayNutrition, remainingForDay } from '../nutrition/calc';
-import { CARDIO_LABELS_DE, cardioSummary } from '../cardio/energy';
+import { cardioSummary } from '../cardio/energy';
+import { activityLabel, hasLevels, levelLabel } from '../cardio/catalog';
 import { EXERCISE_MAP } from '../training/exercises';
 import { suggestProgression } from '../training/progression';
 import { computePersonalRecords, exerciseHistory, mostTrainedExercises } from '../training/stats';
@@ -171,8 +172,8 @@ export function buildCoachContext(
         minutes: c.minutes,
         km: c.km,
         kcal: c.kcal,
-        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k as keyof typeof CARDIO_LABELS_DE], v])),
-        last: last ? `${last.date}: ${CARDIO_LABELS_DE[last.activity]} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ''}${last.activity === 'ems' ? ` (${last.intensity})` : ''}, ${last.kcal} kcal` : null,
+        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [activityLabel(k), v])),
+        last: last ? `${last.date}: ${activityLabel(last.activity)} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ''}${hasLevels(last.activity) && !last.distance_km ? ` (${levelLabel(last.activity, last.intensity)})` : ''}, ${last.kcal} kcal` : null,
       };
     })(),
     key_lifts,

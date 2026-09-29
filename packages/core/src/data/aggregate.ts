@@ -11,7 +11,7 @@ import { suggestedWeekdays } from '../streaks/streaks';
 import { computePersonalRecords, isWorkingSet } from '../training/stats';
 import type { DailyActivity } from '../gamification/xp';
 import { emptyActivity } from '../gamification/xp';
-import { COUNTS_AS_TRAINING } from '../cardio/energy';
+import { countsAsTraining } from '../cardio/catalog';
 import type {
   AthleteProfile,
   CardioSession,
@@ -62,7 +62,7 @@ export function stepsByDate(entries: StepEntry[]): Map<ISODate, StepEntry> {
 /** Days with a completed gym workout or a jog / run / EMS session. */
 export function trainedDates(sessions: WorkoutSession[], cardio: CardioSession[] = []): Set<ISODate> {
   const out = new Set(sessions.filter((s) => !s.deleted && s.status === 'completed').map((s) => s.date));
-  for (const c of cardio) if (!c.deleted && COUNTS_AS_TRAINING[c.activity]) out.add(c.date);
+  for (const c of cardio) if (!c.deleted && countsAsTraining(c.activity)) out.add(c.date);
   return out;
 }
 
@@ -116,7 +116,7 @@ export function buildDailyActivities(data: UserData, from: ISODate, to: ISODate)
   for (const c of data.cardio ?? []) {
     if (c.deleted || !inRange(c.date)) continue;
     const a = get(c.date);
-    a.cardio += 1;
+    if (countsAsTraining(c.activity)) a.cardio += 1; // XP only for sport, not for vacuuming
     a.cardioKcal += c.kcal;
   }
   for (const c of data.checkins) if (!c.deleted && inRange(c.date)) get(c.date).checkin = true;

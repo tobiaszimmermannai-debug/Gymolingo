@@ -31,15 +31,15 @@ export function answerOffline(ctx: CoachContext, question: string): string {
     return lines.join('\n');
   }
 
-  if (has('lauf', 'jogg', 'renn', 'ems', 'cardio', 'ausdauer', 'spazier', 'verbrannt', 'verbrauch')) {
+  if (has('lauf', 'jogg', 'renn', 'ems', 'cardio', 'ausdauer', 'spazier', 'verbrannt', 'verbrauch', 'aktivit', 'sport', 'rad', 'schwimm', 'fussball', 'fußball')) {
     const c = ctx.cardio_28_days;
-    if (!c.sessions) return 'In den letzten 4 Wochen ist noch kein Lauf-, Spazier- oder EMS-Training eingetragen. Unter Training → „Ausdauer & EMS“ trägst du es in 10 Sekunden ein – der Kalorienverbrauch wird automatisch berechnet.';
+    if (!c.sessions) return 'In den letzten 4 Wochen ist noch keine Aktivität eingetragen. Unter Training → „Aktivitäten & Sport“ findest du über 80 Sportarten und Alltagsaktivitäten – der Kalorienverbrauch wird automatisch berechnet.';
     lines.push(`Letzte 4 Wochen: ${c.sessions} Einheiten, ${c.minutes} Minuten${c.km ? `, ${formatNumberDE(c.km)} km` : ''}, ca. ${formatNumberDE(c.kcal, 0)} kcal verbrannt.`);
     const parts = Object.entries(c.by_activity).map(([k, v]) => `${k} ${v}×`);
     if (parts.length) lines.push(`Verteilung: ${parts.join(', ')}.`);
     if (c.last) lines.push(`Zuletzt: ${c.last}.`);
     if (ctx.today_status.cardio_kcal_today) lines.push(`Heute bisher: ${ctx.today_status.cardio_kcal_today} kcal durch Aktivität.`);
-    lines.push('Die Werte sind Schätzungen (MET-Methode, EMS nach Studienwerten) – ideal für den Verlauf.');
+    lines.push('Die Werte sind Schätzungen (MET-Methode nach dem Compendium of Physical Activities, EMS nach Studienwerten) – ideal für den Verlauf.');
     return lines.join('\n');
   }
 

@@ -5,7 +5,8 @@
  * model (server-side) only *interprets* these statistics – it never invents
  * numbers. Without AI the rule-based texts below are shown.
  */
-import { CARDIO_LABELS_DE, cardioSummary, COUNTS_AS_TRAINING } from '../cardio/energy';
+import { cardioSummary } from '../cardio/energy';
+import { activityLabel, countsAsTraining } from '../cardio/catalog';
 import type { ISODate } from '../dates';
 import { addDays, dateRange, endOfWeek, startOfWeek } from '../dates';
 import { formatNumberDE, formatSigned } from '../format';
@@ -114,7 +115,7 @@ export function buildWeeklyReport(
   // ---------- consistency
   const done = data.sessions.filter((s) => !s.deleted && s.status === 'completed' && s.date >= ws && s.date <= we);
   const cardioWeek = (data.cardio ?? []).filter((c) => !c.deleted && c.date >= ws && c.date <= we);
-  const cardioTrainings = cardioWeek.filter((c) => COUNTS_AS_TRAINING[c.activity]).length;
+  const cardioTrainings = cardioWeek.filter((c) => countsAsTraining(c.activity)).length;
   const cs = cardioSummary(cardioWeek, ws, we);
   const schedule = {
     type: p.schedule_type,
@@ -168,7 +169,7 @@ export function buildWeeklyReport(
       volumePrevKg: volume(prevWs, prevWe),
       setsPerMuscle: spmLabeled,
       cardio: cs.sessions
-        ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k as keyof typeof CARDIO_LABELS_DE], v])) }
+        ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [activityLabel(k), v])) }
         : undefined,
     },
     nutrition: {
@@ -398,7 +399,7 @@ export function renderWeeklyReportText(s: WeeklyReportStats): { title: string; s
     body:
       `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ''}. ${c.workingSets} Arbeitssätze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).` +
       (c.cardio
-        ? ` Ausdauer & EMS: ${Object.entries(c.cardio.byActivity)
+        ? ` Aktivitäten: ${Object.entries(c.cardio.byActivity)
             .map(([k, v]) => `${k} ${v}×`)
             .join(', ')}, ${c.cardio.minutes} min${c.cardio.km ? `, ${formatNumberDE(c.cardio.km)} km` : ''}, ca. ${formatNumberDE(c.cardio.kcal, 0)} kcal.`
         : ''),

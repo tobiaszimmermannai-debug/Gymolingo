@@ -278,10 +278,11 @@ export interface StepEntry extends BaseRow {
   source: StepSource;
 }
 
-export type CardioActivity = 'walk' | 'jog' | 'run' | 'ems';
+/** id from the activity catalog (cardio/catalog.ts), e.g. 'jog', 'ems', 'soccer', 'vacuuming' */
+export type CardioActivity = string;
 export type CardioIntensity = 'light' | 'medium' | 'intense';
 
-/** Endurance session (walk / jog / run) or EMS training. kcal is computed (MET) unless set manually. */
+/** Logged activity (sport or everyday, see the catalog). kcal is computed (MET) unless set manually. */
 export interface CardioSession extends BaseRow {
   date: ISODate;
   activity: CardioActivity;

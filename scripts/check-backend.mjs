@@ -13,6 +13,14 @@ const h = { apikey: KEY };
 /** exists when anon gets "permission denied" (42501) instead of "not found" */
 async function exists(kind, name, args = {}) {
   try {
+    if (kind === 'version') {
+      // schema marker (public for anon): installed updates ≥ required version
+      const r = await fetch(`${URL}/rest/v1/rpc/gymolingo_schema`, { method: 'POST', headers: { ...h, 'content-type': 'application/json' }, body: '{}' });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) return Number(body) >= name;
+      if (['PGRST202', '42883'].includes(body.code)) return false;
+      return `unklar (${r.status} ${body.code ?? ''} ${body.message ?? ''})`;
+    }
     const r = kind === 'table' ? await fetch(`${URL}/rest/v1/${name}?limit=0`, { headers: h }) : await fetch(`${URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify(args) });
     const body = await r.json().catch(() => ({}));
     if (r.ok || body.code === '42501') return true;
@@ -30,6 +38,7 @@ const checks = [
   ['Gemeinsamer KI-Schlüssel', 'rpc', 'get_shared_ai_key', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
   ['Status-Meldungen', 'rpc', 'set_status', 'Update-SQL (supabase/updates/2026-09-30-status.sql)', { p_emoji: null, p_text: null }],
   ['Freunde einladen', 'rpc', 'my_invite_code', 'Update-SQL (supabase/updates/2026-09-30-invites.sql)'],
+  ['Aktivitäten-Katalog', 'version', 2026093003, 'Update-SQL (supabase/updates/2026-09-30-activities.sql)'],
 ];
 let missing = 0;
 const results = [];

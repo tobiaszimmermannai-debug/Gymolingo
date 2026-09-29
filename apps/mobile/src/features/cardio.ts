@@ -1,8 +1,8 @@
 /**
- * Walk / jog / run / EMS sessions: calories are computed from duration,
- * distance or intensity and the latest body weight (core/cardio/energy).
+ * Logged activities (sports and everyday, see core/cardio/catalog): calories are
+ * computed from duration, distance or intensity and the latest body weight.
  */
-import { cardioKcal, type CardioActivity, type CardioIntensity, type CardioSession } from '@gymolingo/core';
+import { activityDef, cardioKcal, type CardioActivity, type CardioIntensity, type CardioSession } from '@gymolingo/core';
 import { insert, remove, update, useDB } from '@/data/store';
 import { requestSync } from '@/data/sync';
 
@@ -27,7 +27,7 @@ export interface CardioInput {
 }
 
 export function computedKcal(i: Pick<CardioInput, 'activity' | 'intensity' | 'duration_min' | 'distance_km'>): number {
-  return cardioKcal({ ...i, distance_km: i.activity === 'ems' ? null : i.distance_km }, currentWeightKg());
+  return cardioKcal({ ...i, distance_km: activityDef(i.activity).distance ? i.distance_km : null }, currentWeightKg());
 }
 
 export function saveCardio(i: CardioInput, id?: string): string {
@@ -36,7 +36,7 @@ export function saveCardio(i: CardioInput, id?: string): string {
     date: i.date,
     activity: i.activity,
     duration_min: Math.round(i.duration_min * 10) / 10,
-    distance_km: i.activity === 'ems' || !i.distance_km ? null : Math.round(i.distance_km * 100) / 100,
+    distance_km: !activityDef(i.activity).distance || !i.distance_km ? null : Math.round(i.distance_km * 100) / 100,
     intensity: i.intensity,
     kcal: i.kcal !== null && i.kcal !== auto ? Math.round(i.kcal) : auto,
     kcal_manual: i.kcal !== null && i.kcal !== auto,
@@ -59,4 +59,13 @@ export function recentCardio(limit = 5): CardioSession[] {
     .filter((c) => !c.deleted)
     .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
+}
+
+/** Quick buttons: recently used activities first, then walk / jog / run / EMS. */
+export function quickActivities(sessions: CardioSession[], count = 5): string[] {
+  const recent = [...sessions]
+    .filter((c) => !c.deleted)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
+    .map((c) => c.activity);
+  return [...new Set([...recent, 'walk', 'jog', 'run', 'ems'])].slice(0, count);
 }

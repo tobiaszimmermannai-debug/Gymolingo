@@ -88,6 +88,7 @@ Letzte Aktualisierung: 2026-09-30
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
 - ✅ Tagesbriefing auf Home (heutiger Fokus, offene Kalorien/Protein, gefährdete Serie, Tester zuletzt online + Status)
+- ✅ Aktivitäten-Katalog (Nutzerwunsch): 86 Sportarten und Alltagsaktivitäten (Ausdauer, Fitness & Kurse, Ballsport, Outdoor/Wasser/Winter, Haushalt, Garten, Alltag inkl. Sex) mit MET-Werten (Compendium of Physical Activities), bis zu 3 Intensitätsstufen mit eigenen Namen, Suche (ohne Umlaute, Synonyme), Kategorien-Filter, kcal/30 min fürs eigene Gewicht; Radfahren nach Tempo; Sport zählt als Trainingstag + XP, Alltag nicht; Alltag/Haushalt/Garten zählen nur den Mehrverbrauch (MET − 1); Schnellwahl zuletzt genutzter Aktivitäten
 - ✅ Freunde einladen (Nutzerwunsch): persönlicher Link `…/invite?c=CODE` per WhatsApp (neuer Tab), System-Teilen, Kopieren oder QR-Code (qrcode-generator + SVG, per Decoder verifiziert). Wer den Link öffnet und sich anmeldet, ist sofort befreundet (`accept_invite`); Landingpage zeigt, wer einlädt; Hinweis-/Erfolgskarte auf Home; Link erneuerbar. Ohne Konto/Server wird der normale App-Link geteilt
 - ✅ Fun-Status-Meldungen (Nutzerwunsch): 26 Sport-Meme-/Tech-Sprüche („🥤 Monster Zero White intus – Pump incoming“) oder eigener Text (Emoji + max. 60 Zeichen), Dauer Heute/3 Tage/unbegrenzt; Chip auf Home, Anzeige bei Freunden im Tagesbriefing und in der Community-Freundesliste; lokal gespeichert, bei Konto per `set_status()` synchronisiert
 - ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
@@ -104,11 +105,11 @@ Letzte Aktualisierung: 2026-09-30
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
-- ✅ core: 134 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, Ausdauer/EMS, Status)
-- ✅ DB: 79 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel, Status, Einladungen); `setup.sql` (12 Migrationen)
+- ✅ core: 143 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, Ausdauer/EMS, Aktivitäten-Katalog, Status)
+- ✅ DB: 83 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel, Status, Einladungen, Aktivitäten); `setup.sql` (13 Migrationen)
 - ✅ Edge Functions: 38 Checks (`npm run test:edge`)
-- ✅ E2E lokal (17, inkl. App teilen/QR/WhatsApp, Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (6): Einladungslink → Onboarding → Konto → sofort befreundet, Link erneuern; Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Status + Gruppen-Schlüssel (räumt Freigabe am Ende auf), Kontolöschung, Offline-Sync, Fortschrittsbilder
+- ✅ E2E lokal (18, inkl. Aktivitäten-Katalog (Fußball/Staubsaugen/Sex), App teilen/QR/WhatsApp, Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
+- ✅ E2E Backend (6, Zwei-Geräte-Sync inkl. Katalog-Aktivität): Einladungslink → Onboarding → Konto → sofort befreundet, Link erneuern; Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Status + Gruppen-Schlüssel (räumt Freigabe am Ende auf), Kontolöschung, Offline-Sync, Fortschrittsbilder
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -134,6 +135,7 @@ Letzte Aktualisierung: 2026-09-30
 - Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.
 - Einrichtung vereinfacht (Nutzer kam mit Secrets/Tokens nicht zurecht): `supabase/setup.sql` (aus Migrationen generiert, CI prüft Aktualität) im SQL Editor ausführen; öffentliche URL/Key in `config/backend.env`; Pages 1 Klick.
 - **Ein Gemini-Schlüssel für alle** (Nutzerwunsch): Besitzer gibt seinen Geräte-Schlüssel frei (`shared_ai_key`, `set_shared_ai_key`/`get_shared_ai_key`), **alle angemeldeten Nutzer** erhalten ihn automatisch (Limit 25/Person/Tag bleibt; Migration 08).
+- Aktivitäten: `cardio_sessions.activity` = Katalog-ID (Check `^[a-z0-9_]{2,32}$`, Migration 13); unbekannte IDs (neuere App-Version) → „Aktivität“, 4 MET. Sex: Compendium 1,8/2,8 MET, Stufe „Leidenschaftlich“ 3,5 MET nach Frappier 2013 (≈ 4,2 kcal/min). Padel/E-Bike geschätzt. Schema-Marker `gymolingo_schema()` (2026093003) für den Deploy-Check; Sync-Fehler 23514 wird verständlich erklärt.
 - Einladungen: `profiles.invite_code` (12 Hex-Zeichen, geheim), `my_invite_code`/`renew_invite_code`, `invite_info` (auch anonym, für die Landingpage), `accept_invite` (legt sofort eine akzeptierte Freundschaft an – Teilen des Links = Zustimmung). Code wird in `prefs.pendingInvite` gemerkt und nach Anmeldung im Hintergrund-Sync eingelöst. Nach Login `router.dismissTo('/')` statt `replace` (kein doppelter Home-Screen im Stack).
 - Status-Meldungen: `profiles.status_emoji/status_text/status_until`, `set_status()` (kürzt auf 80 Zeichen), `friends_activity()` liefert aktive Status (unabhängig von `share_online_status` – der Status ist bewusst gesetzt). Migration idempotent; Update für bestehende Projekte: `supabase/updates/2026-09-30-status.sql`. Ohne Update speichert die App lokal und meldet „Datenbank-Update nötig“.
 - „Zuletzt online“: `profiles.last_seen_at`, `touch_last_seen()`, `friends_activity()` (nur Freunde, abschaltbar via `share_online_status`), Anzeige im **Tagesbriefing** auf Home.
@@ -147,9 +149,9 @@ Letzte Aktualisierung: 2026-09-30
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Freunde einladen": core 134/134, DB 79/79, E2E lokal 17/17, E2E Backend 6/6, Typecheck grün (Edge unverändert 38/38).
+- Stand „Aktivitäten-Katalog": core 143/143, DB 83/83, Edge 38/38, E2E lokal 18/18, E2E Backend 6/6, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Updates „Status“ und „Einladungen“ vom Nutzer eingespielt (30.09.), Nutzer bestätigt: alles läuft. Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
+1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Updates „Status“ und „Einladungen“ vom Nutzer eingespielt (30.09.). Offen: `supabase/updates/2026-09-30-activities.sql` (Deploy-Check „Aktivitäten-Katalog“). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

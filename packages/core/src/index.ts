@@ -25,4 +25,5 @@ export * from './dev/demo';
 export * from './ai/gemini';
 export * from './ai/tasks';
 export * from './cardio/energy';
+export * from './cardio/catalog';
 export * from './social/status';

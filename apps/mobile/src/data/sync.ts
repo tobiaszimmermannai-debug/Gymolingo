@@ -89,7 +89,10 @@ export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
       const report = await syncAll(TABLES, localAdapter, remoteAdapter);
       if (report.errors.length) {
         const offline = report.errors.every((e) => /fetch|network|timeout|disconnected/i.test(e.message));
-        const msg = report.errors.map((e) => `${e.table}: ${e.message}`).join('; ');
+        // a check violation on new activity ids = the Supabase update has not been run yet
+        const explain = (e: { table: string; message: string }) =>
+          e.table === 'cardio_sessions' && /23514|activity_check/.test(e.message) ? 'Neue Aktivitäten brauchen das Datenbank-Update (Einrichtungs-Checkliste) – sie bleiben bis dahin auf diesem Gerät gespeichert.' : `${e.table}: ${e.message}`;
+        const msg = report.errors.map(explain).join('; ');
         setSyncStatus({ syncState: offline ? 'offline' : 'error', syncError: msg });
         result = { ok: false, message: msg };
       } else {

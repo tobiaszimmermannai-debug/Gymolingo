@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanStatusText, isStatusActive, STATUS_MAX_TEXT, STATUS_PRESETS, statusUntil } from './status';
+import { cleanStatusText, isStatusActive, STATUS_MAX_TEXT, STATUS_PRESETS, statusUntil } from '../src/social/status';
 
 describe('status presets', () => {
   it('contains the Monster Zero White classic and fits the limits', () => {

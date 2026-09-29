@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CARDIO_LABELS_DE, formatLastSeen, formatNumberDE } from '@gymolingo/core';
+import { activityLabel, formatLastSeen, formatNumberDE } from '@gymolingo/core';
 import { Card } from '@/ui/Card';
 import { Text } from '@/ui/Text';
 import { Row } from '@/ui/Screen';
@@ -31,7 +31,7 @@ export function DailyBriefing({ t }: { t: Today }) {
   if (t.cardioToday.length)
     lines.push({
       icon: 'walk-outline',
-      text: `Aktivität heute: ${t.cardioToday.map((c) => `${CARDIO_LABELS_DE[c.activity]} ${formatNumberDE(c.duration_min, 0)} min`).join(', ')} – ca. ${formatNumberDE(t.burnedKcal, 0)} kcal verbrannt${t.profile.add_exercise_calories ? ' (zum Kalorienziel addiert)' : ''}.`,
+      text: `Aktivität heute: ${t.cardioToday.map((c) => `${activityLabel(c.activity)} ${formatNumberDE(c.duration_min, 0)} min`).join(', ')} – ca. ${formatNumberDE(t.burnedKcal, 0)} kcal verbrannt${t.profile.add_exercise_calories ? ' (zum Kalorienziel addiert)' : ''}.`,
     });
   if (t.remaining.kcal > 0) lines.push({ icon: 'restaurant-outline', text: `Noch ${formatNumberDE(t.remaining.kcal, 0)} kcal und ${formatNumberDE(Math.max(0, t.remaining.protein_g), 0)} g Protein offen.` });
   else lines.push({ icon: 'restaurant-outline', text: 'Kalorienziel für heute erreicht.' });
