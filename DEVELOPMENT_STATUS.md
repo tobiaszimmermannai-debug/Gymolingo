@@ -126,6 +126,7 @@ Letzte Aktualisierung: 2026-09-28
 - `supabase test db` kann das pg_prove-Image nicht laden → `scripts/test-db.sh` führt dieselben pgTAP-Dateien via psql aus.
 
 ## Entscheidungen
+- Gemini-Schlüssel: Google gibt seit 2026 „AQ.“-Auth-Keys aus, alte „AIza“-Keys werden seit 09/2026 abgelehnt → Format-Prüfung akzeptiert beide (`looksLikeGeminiKey`), eingefügter Text wird bereinigt, Google-Fehlertext wird verständlich angezeigt; Prüfung per `models?pageSize=1`.
 - **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
 - Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.

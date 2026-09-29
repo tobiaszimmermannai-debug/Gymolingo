@@ -15,7 +15,9 @@ import {
   aiWeeklyReportSections,
   bodyFatFacts,
   GeminiError,
-  geminiValidateKey,
+  geminiCheckKey,
+  looksLikeGeminiKey,
+  normalizeGeminiKey,
   todayISO,
   type BodyFatResult,
   type CoachContext,
@@ -102,12 +104,22 @@ function toAiError(e: unknown): AiError {
 }
 
 /** Checks and stores a Gemini key on this device. */
+/** Google's error text in plain German where we know it. */
+function explainGoogleError(message: string | undefined): string {
+  if (!message) return '';
+  if (/API key not valid|API_KEY_INVALID/i.test(message)) return ' Google meldet: Schlüssel ungültig. Alte Schlüssel („AIza…“) lehnt Google seit September 2026 ab – bitte in Google AI Studio einen neuen erstellen (beginnt mit „AQ.“).';
+  if (/has not been used|is disabled|SERVICE_DISABLED/i.test(message)) return ' Google meldet: Die Gemini-API ist für dieses Projekt nicht aktiviert – am einfachsten einen neuen Schlüssel direkt in Google AI Studio erstellen.';
+  if (/referer|referrer|restricted|blocked/i.test(message)) return ' Google meldet: Der Schlüssel ist auf andere Websites/Apps beschränkt – in der Google Cloud Console die Einschränkung entfernen oder einen neuen Schlüssel in AI Studio erstellen.';
+  if (/location is not supported/i.test(message)) return ' Google meldet: Die Gemini-API ist an diesem Standort nicht verfügbar.';
+  return ` Google meldet: ${message}`;
+}
+
 export async function saveDeviceKey(raw: string): Promise<void> {
-  const key = raw.trim();
-  if (!/^[A-Za-z0-9_-]{20,120}$/.test(key)) throw new AiError('Das sieht nicht wie ein Gemini-API-Schlüssel aus (beginnt meist mit „AIza…“).', 'failed');
-  const check = await geminiValidateKey(key);
-  if (check === 'invalid') throw new AiError('Google lehnt diesen Schlüssel ab. Bitte in Google AI Studio prüfen und neu kopieren.', 'failed');
-  if (check === 'unavailable') throw new AiError('Google ist gerade nicht erreichbar – bitte später erneut versuchen.', 'unavailable');
+  const key = normalizeGeminiKey(raw);
+  if (!looksLikeGeminiKey(key)) throw new AiError('Das sieht nicht wie ein Gemini-API-Schlüssel aus. Neue Schlüssel beginnen mit „AQ.“, ältere mit „AIza“. Bitte in Google AI Studio auf „Kopieren“ tippen und hier einfügen.', 'failed');
+  const check = await geminiCheckKey(key);
+  if (check.result === 'invalid') throw new AiError(`Google lehnt diesen Schlüssel ab.${explainGoogleError(check.message)}`, 'failed');
+  if (check.result === 'unavailable') throw new AiError(`Google ist gerade nicht erreichbar – bitte später erneut versuchen.${check.message ? ` (${check.message})` : ''}`, 'unavailable');
   setPrefs({ geminiKey: key, aiBlocks: {} });
 }
 
@@ -129,6 +141,7 @@ export async function refreshSharedKey() {
 export async function shareKeyWithAll() {
   const key = useDB.getState().prefs.geminiKey;
   if (!supabase || !key) throw new AiError('Zuerst einen Schlüssel auf diesem Gerät speichern.', 'failed');
+  if (key.length > 200) throw new AiError('Dieser Schlüssel ist zu lang für die Freigabe – bitte Claude Bescheid geben.', 'failed');
   const { error } = await supabase.rpc('set_shared_ai_key', { p_key: key });
   if (error) throw new AiError(error.message, 'failed');
   await refreshSharedKey();

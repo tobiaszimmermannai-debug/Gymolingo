@@ -138,17 +138,42 @@ export async function geminiGenerate(key: string, p: GenerateParams, cfg: Gemini
   return { text: text || null, model: used, blocked: false };
 }
 
-/** Checks a key with a cheap metadata request (no tokens used). */
-export async function geminiValidateKey(key: string, cfg: GeminiConfig = {}): Promise<'ok' | 'invalid' | 'unavailable'> {
+/**
+ * Cleans a pasted key: removes spaces, line breaks, invisible characters and quotes.
+ * Google issues "AQ.…" auth keys since 2026 (older keys start with "AIza…").
+ */
+export function normalizeGeminiKey(raw: string): string {
+  return raw.replace(/[\s\u200B-\u200D\uFEFF"'„“”‚‘’`]/g, '');
+}
+
+export function looksLikeGeminiKey(key: string): boolean {
+  return /^[A-Za-z0-9._~+/=-]{20,300}$/.test(key);
+}
+
+export interface GeminiKeyCheck {
+  result: 'ok' | 'invalid' | 'unavailable';
+  /** Google's own error text, if any */
+  message?: string;
+}
+
+/** Checks a key with a cheap request that uses no tokens (list one model). */
+export async function geminiCheckKey(key: string, cfg: GeminiConfig = {}): Promise<GeminiKeyCheck> {
   const f = cfg.fetchImpl ?? fetch;
   try {
-    const res = await timedFetch(f, `${cfg.base ?? GEMINI_API_BASE}/v1beta/models/${encodeURIComponent(cfg.textModel ?? GEMINI_TEXT_MODEL)}`, { headers: { 'x-goog-api-key': key } }, 15000);
-    if (res.ok || res.status === 429) return 'ok';
-    if ([400, 401, 403].includes(res.status)) return 'invalid';
-    return 'unavailable';
-  } catch {
-    return 'unavailable';
+    const res = await timedFetch(f, `${cfg.base ?? GEMINI_API_BASE}/v1beta/models?pageSize=1`, { headers: { 'x-goog-api-key': key } }, 15000);
+    if (res.ok || res.status === 429) return { result: 'ok' };
+    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    const message = body.error?.message?.slice(0, 300);
+    if ([400, 401, 403].includes(res.status)) return { result: 'invalid', message };
+    return { result: 'unavailable', message: message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { result: 'unavailable', message: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Short form used by the server. */
+export async function geminiValidateKey(key: string, cfg: GeminiConfig = {}): Promise<'ok' | 'invalid' | 'unavailable'> {
+  return (await geminiCheckKey(key, cfg)).result;
 }
 
 /** Where blocked models are remembered (database on the server, local storage in the app). */

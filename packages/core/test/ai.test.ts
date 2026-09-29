@@ -88,3 +88,21 @@ describe('ai tasks', () => {
     expect(parts[2].text).toContain('180 cm');
   });
 });
+
+import { geminiCheckKey, looksLikeGeminiKey, normalizeGeminiKey } from '../src/ai/gemini';
+
+describe('gemini keys', () => {
+  it('accepts the new "AQ." auth keys and the older "AIza" keys, cleans pasted text', () => {
+    expect(looksLikeGeminiKey('AQ.Ab8RN6LxZ3_example-Key.part2')).toBe(true);
+    expect(looksLikeGeminiKey('AIzaSyA1234567890abcdefghijklmnopqrstu')).toBe(true);
+    expect(looksLikeGeminiKey('kurz')).toBe(false);
+    expect(normalizeGeminiKey(' „AQ.Ab8RN6​LxZ3_example-Key"\n')).toBe('AQ.Ab8RN6LxZ3_example-Key');
+  });
+  it('key check lists one model (no tokens) and returns Google\'s reason', async () => {
+    const { f, calls } = mockFetch(() => ({ status: 400, json: { error: { message: 'API key not valid. Please pass a valid API key.' } } }));
+    const r = await geminiCheckKey('AQ.x', { fetchImpl: f });
+    expect(calls[0].url).toBe('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1');
+    expect(calls[0].key).toBe('AQ.x');
+    expect(r).toEqual({ result: 'invalid', message: 'API key not valid. Please pass a valid API key.' });
+  });
+});

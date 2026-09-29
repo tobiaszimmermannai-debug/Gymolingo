@@ -3219,16 +3219,27 @@ async function geminiGenerate(key, p, cfg = {}) {
   const text = (cand?.content?.parts ?? []).filter((x) => !x.thought && typeof x.text === "string").map((x) => x.text).join("").trim();
   return { text: text || null, model: used, blocked: false };
 }
-async function geminiValidateKey(key, cfg = {}) {
+function normalizeGeminiKey(raw) {
+  return raw.replace(/[\s\u200B-\u200D\uFEFF"'„“”‚‘’`]/g, "");
+}
+function looksLikeGeminiKey(key) {
+  return /^[A-Za-z0-9._~+/=-]{20,300}$/.test(key);
+}
+async function geminiCheckKey(key, cfg = {}) {
   const f = cfg.fetchImpl ?? fetch;
   try {
-    const res = await timedFetch(f, `${cfg.base ?? GEMINI_API_BASE}/v1beta/models/${encodeURIComponent(cfg.textModel ?? GEMINI_TEXT_MODEL)}`, { headers: { "x-goog-api-key": key } }, 15e3);
-    if (res.ok || res.status === 429) return "ok";
-    if ([400, 401, 403].includes(res.status)) return "invalid";
-    return "unavailable";
-  } catch {
-    return "unavailable";
+    const res = await timedFetch(f, `${cfg.base ?? GEMINI_API_BASE}/v1beta/models?pageSize=1`, { headers: { "x-goog-api-key": key } }, 15e3);
+    if (res.ok || res.status === 429) return { result: "ok" };
+    const body = await res.json().catch(() => ({}));
+    const message = body.error?.message?.slice(0, 300);
+    if ([400, 401, 403].includes(res.status)) return { result: "invalid", message };
+    return { result: "unavailable", message: message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { result: "unavailable", message: e instanceof Error ? e.message : String(e) };
   }
+}
+async function geminiValidateKey(key, cfg = {}) {
+  return (await geminiCheckKey(key, cfg)).result;
 }
 async function geminiGuarded(key, models, p, store, cfg = {}) {
   let last = null;
@@ -3510,6 +3521,7 @@ export {
   formatNumberDE,
   formatPace,
   formatSigned,
+  geminiCheckKey,
   geminiGenerate,
   geminiGuarded,
   geminiValidateKey,
@@ -3530,6 +3542,7 @@ export {
   latestNavyBodyFat,
   levelFromXp,
   linearSlope,
+  looksLikeGeminiKey,
   mealsByDate,
   mergeRemoteRows,
   mifflinStJeor,
@@ -3540,6 +3553,7 @@ export {
   navyRequiredFields,
   nextMilestone,
   normalize,
+  normalizeGeminiKey,
   nutrientsForAmount,
   nutritionTips,
   openTasks,

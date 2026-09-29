@@ -5,6 +5,7 @@
  *  - delete: removes it
  * The key is never returned to the app.
  */
+import { looksLikeGeminiKey, normalizeGeminiKey } from '../_shared/core.mjs';
 import { geminiKey, validateKey } from '../_shared/gemini.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { userClient } from '../_shared/userData.ts';
@@ -41,8 +42,8 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === 'set') {
-    const key = String(body.key ?? '').trim();
-    if (!/^[A-Za-z0-9_-]{20,120}$/.test(key)) return json({ error: 'Das sieht nicht wie ein Gemini-API-Schlüssel aus (beginnt meist mit „AIza…“).' }, 400);
+    const key = normalizeGeminiKey(String(body.key ?? ''));
+    if (!looksLikeGeminiKey(key)) return json({ error: 'Das sieht nicht wie ein Gemini-API-Schlüssel aus (neue Schlüssel beginnen mit „AQ.“, ältere mit „AIza“).' }, 400);
     const check = await validateKey(key);
     if (check === 'invalid') return json({ error: 'Google lehnt diesen Schlüssel ab. Bitte in Google AI Studio prüfen und neu kopieren.' }, 400);
     if (check === 'unavailable') return json({ error: 'Google ist gerade nicht erreichbar – bitte später erneut versuchen.' }, 502);

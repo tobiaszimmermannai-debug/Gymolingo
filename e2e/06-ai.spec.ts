@@ -14,7 +14,7 @@ test('Gemini key on the device: coach, body fat from photos, daily limit display
   await page.getByTestId('ai-key-input').fill('AIzaBAD_invalid_key_00000000000000');
   await page.getByTestId('ai-key-save').click();
   await expect(page.getByTestId('ai-key-msg')).toContainText('lehnt');
-  await page.getByTestId('ai-key-input').fill('AIzaSyTestSharedKey000000000000wxyz');
+  await page.getByTestId('ai-key-input').fill(' AQ.Ab8RN6TestSharedKey-000000.wxyz\n');
   await page.getByTestId('ai-key-save').click();
   await expect(page.getByTestId('ai-key-status')).toContainText('…wxyz');
   await expect(page.getByTestId('ai-usage')).toContainText('Heute 0 von 25');
@@ -26,7 +26,7 @@ test('Gemini key on the device: coach, body fat from photos, daily limit display
   await expect(page.getByTestId('coach-msg-assistant').last()).toContainText('KI-Antwort');
   const chat = google.calls.at(-1)!;
   expect(chat.url).toContain('/models/gemini-flash-lite-latest:generateContent');
-  expect(chat.key).toBe('AIzaSyTestSharedKey000000000000wxyz');
+  expect(chat.key).toBe('AQ.Ab8RN6TestSharedKey-000000.wxyz');
   expect(JSON.stringify(chat.body.contents)).toContain('<nutzerdaten>');
 
   // body fat: adding a photo starts the estimate (consent first), downscaled to 1024 px, Flash model

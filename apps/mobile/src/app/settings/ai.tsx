@@ -164,7 +164,7 @@ export default function AiSettings() {
       <Card>
         <Text variant="h3">So geht's (2 Minuten)</Text>
         <Text tone="secondary" style={{ marginTop: 6 }}>
-          1. Google AI Studio öffnen und mit dem Google-Konto anmelden.{'\n'}2. „API-Schlüssel erstellen“ tippen und kopieren (beginnt mit „AIza…“). Kein Zahlungsmittel hinterlegen.{'\n'}3. Hier einfügen, speichern und „Für alle Nutzer freigeben“ tippen – fertig.
+          1. Google AI Studio öffnen und mit dem Google-Konto anmelden.{'\n'}2. „API-Schlüssel erstellen“ tippen und kopieren (neue Schlüssel beginnen mit „AQ.“). Kein Zahlungsmittel hinterlegen.{'\n'}3. Hier einfügen, speichern und „Für alle Nutzer freigeben“ tippen – fertig.
         </Text>
         <Button title="Google AI Studio öffnen" icon="open-outline" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => Linking.openURL(AI_STUDIO)} />
         <Input
@@ -172,7 +172,7 @@ export default function AiSettings() {
           label={key ? 'Anderen Schlüssel einfügen' : 'Gemini-API-Schlüssel'}
           value={input}
           onChangeText={setInput}
-          placeholder="AIza…"
+          placeholder="AQ.… oder AIza…"
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
