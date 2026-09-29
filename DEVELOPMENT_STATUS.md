@@ -145,6 +145,6 @@ Letzte Aktualisierung: 2026-09-28
 - Stand „Ausdauer & EMS, Gruppen-Schlüssel, Privatsphäre-Voreinstellung": core 126/126, DB 61/61, Edge 38/38, E2E lokal 14/14, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. **Supabase verbunden** (`config/backend.env`: ozjugovffdktizmmsvgm). Deploy-Check (`scripts/check-backend.mjs`, Annotations im Workflow) meldet: E-Mail-Bestätigung aus ✅, aber **Tabellen fehlen** → Nutzer muss `supabase/setup.sql` (vollständig, 10 Migrationen) im SQL Editor ausführen – er hatte versehentlich das Update-SQL genommen (Fehler „schema private does not exist“); danach Deploy PWA erneut laufen lassen und Annotations prüfen.
+1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.
