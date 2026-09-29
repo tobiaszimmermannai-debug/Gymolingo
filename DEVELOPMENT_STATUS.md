@@ -88,6 +88,7 @@ Letzte Aktualisierung: 2026-09-30
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
 - ✅ Tagesbriefing auf Home (heutiger Fokus, offene Kalorien/Protein, gefährdete Serie, Tester zuletzt online + Status)
+- ✅ Freunde einladen (Nutzerwunsch): persönlicher Link `…/invite?c=CODE` per WhatsApp (neuer Tab), System-Teilen, Kopieren oder QR-Code (qrcode-generator + SVG, per Decoder verifiziert). Wer den Link öffnet und sich anmeldet, ist sofort befreundet (`accept_invite`); Landingpage zeigt, wer einlädt; Hinweis-/Erfolgskarte auf Home; Link erneuerbar. Ohne Konto/Server wird der normale App-Link geteilt
 - ✅ Fun-Status-Meldungen (Nutzerwunsch): 26 Sport-Meme-/Tech-Sprüche („🥤 Monster Zero White intus – Pump incoming“) oder eigener Text (Emoji + max. 60 Zeichen), Dauer Heute/3 Tage/unbegrenzt; Chip auf Home, Anzeige bei Freunden im Tagesbriefing und in der Community-Freundesliste; lokal gespeichert, bei Konto per `set_status()` synchronisiert
 - ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
 - ✅ Edge Functions `coach`, `meal-photo`, `body-fat`, `ai-key` auf Gemini (persönliche Schlüssel, JSON-Schema, Safety/429-Fallback, Flash→Flash-Lite, Tageslimit) – 38 Checks gegen lokales Supabase + Mock-Gemini (inkl. Sperre bei Kontingent-Ende)
@@ -104,10 +105,10 @@ Letzte Aktualisierung: 2026-09-30
 
 ### 12. Tests
 - ✅ core: 134 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, Ausdauer/EMS, Status)
-- ✅ DB: 69 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel, Status); `setup.sql` (11 Migrationen)
+- ✅ DB: 79 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel, Status, Einladungen); `setup.sql` (12 Migrationen)
 - ✅ Edge Functions: 38 Checks (`npm run test:edge`)
-- ✅ E2E lokal (15, inkl. Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (5): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Status + Gruppen-Schlüssel (räumt Freigabe am Ende auf), Kontolöschung, Offline-Sync, Fortschrittsbilder
+- ✅ E2E lokal (17, inkl. App teilen/QR/WhatsApp, Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
+- ✅ E2E Backend (6): Einladungslink → Onboarding → Konto → sofort befreundet, Link erneuern; Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Status + Gruppen-Schlüssel (räumt Freigabe am Ende auf), Kontolöschung, Offline-Sync, Fortschrittsbilder
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -133,6 +134,7 @@ Letzte Aktualisierung: 2026-09-30
 - Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.
 - Einrichtung vereinfacht (Nutzer kam mit Secrets/Tokens nicht zurecht): `supabase/setup.sql` (aus Migrationen generiert, CI prüft Aktualität) im SQL Editor ausführen; öffentliche URL/Key in `config/backend.env`; Pages 1 Klick.
 - **Ein Gemini-Schlüssel für alle** (Nutzerwunsch): Besitzer gibt seinen Geräte-Schlüssel frei (`shared_ai_key`, `set_shared_ai_key`/`get_shared_ai_key`), **alle angemeldeten Nutzer** erhalten ihn automatisch (Limit 25/Person/Tag bleibt; Migration 08).
+- Einladungen: `profiles.invite_code` (12 Hex-Zeichen, geheim), `my_invite_code`/`renew_invite_code`, `invite_info` (auch anonym, für die Landingpage), `accept_invite` (legt sofort eine akzeptierte Freundschaft an – Teilen des Links = Zustimmung). Code wird in `prefs.pendingInvite` gemerkt und nach Anmeldung im Hintergrund-Sync eingelöst. Nach Login `router.dismissTo('/')` statt `replace` (kein doppelter Home-Screen im Stack).
 - Status-Meldungen: `profiles.status_emoji/status_text/status_until`, `set_status()` (kürzt auf 80 Zeichen), `friends_activity()` liefert aktive Status (unabhängig von `share_online_status` – der Status ist bewusst gesetzt). Migration idempotent; Update für bestehende Projekte: `supabase/updates/2026-09-30-status.sql`. Ohne Update speichert die App lokal und meldet „Datenbank-Update nötig“.
 - „Zuletzt online“: `profiles.last_seen_at`, `touch_last_seen()`, `friends_activity()` (nur Freunde, abschaltbar via `share_online_status`), Anzeige im **Tagesbriefing** auf Home.
 - Edge Functions prüfen den Nutzer selbst (`verify_jwt = false`, `auth.getUser`) – kompatibel mit neuen Supabase-Signaturschlüsseln; `apikey` wird aus der Anfrage übernommen.
@@ -145,9 +147,9 @@ Letzte Aktualisierung: 2026-09-30
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Status-Meldungen": core 134/134, DB 69/69, E2E lokal 15/15, E2E Backend 5/5, Typecheck grün (Edge unverändert 38/38).
+- Stand „Freunde einladen": core 134/134, DB 79/79, E2E lokal 17/17, E2E Backend 6/6, Typecheck grün (Edge unverändert 38/38).
 
 ## Nächste konkrete Aufgabe
-1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Nutzer muss `supabase/updates/2026-09-30-status.sql` einmal ausführen (Deploy-Check meldet „Status-Meldungen“). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
+1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Status-Update vom Nutzer eingespielt (30.09.); `supabase/updates/2026-09-30-invites.sql` muss noch einmal ausgeführt werden (Deploy-Check meldet „Freunde einladen“). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

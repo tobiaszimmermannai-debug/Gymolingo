@@ -31,7 +31,8 @@ export default function Auth() {
     if (!r.ok) return setError(r.error ?? 'Fehlgeschlagen');
     if ('needsConfirmation' in r && r.needsConfirmation) return setInfo('Fast geschafft! Bitte bestätige deine E-Mail-Adresse über den Link, den wir dir geschickt haben, und melde dich dann an.');
     const onboarded = useDB.getState().tables.athlete_profiles[useDB.getState().userId]?.onboarding_completed;
-    router.replace(onboarded ? '/' : '/onboarding');
+    if (onboarded) router.dismissTo('/');
+    else router.replace('/onboarding');
   };
 
   if (!isBackendConfigured) {

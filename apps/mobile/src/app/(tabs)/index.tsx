@@ -17,6 +17,7 @@ import { BADGE_MAP } from '@gymolingo/core';
 import { SyncBadge } from '@/features/SyncBadge';
 import { DailyBriefing } from '@/features/DailyBriefing';
 import { useMyStatus } from '@/features/status';
+import { InviteCard } from '@/features/InviteCard';
 
 const STREAK_ICONS: Record<StreakKind, string> = { training: '🏋️', nutrition: '📒', protein: '🥩', steps: '👟', checkin: '🌙', weight: '⚖️' };
 
@@ -64,6 +65,8 @@ export default function Home() {
           {status ? status.text : 'Status setzen'}
         </Text>
       </Pressable>
+
+      <InviteCard />
 
       {/* Streaks */}
       <Pressable onPress={() => router.push('/achievements')} accessibilityRole="button" accessibilityLabel="Streaks und Erfolge">

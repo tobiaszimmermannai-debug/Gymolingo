@@ -36,6 +36,7 @@ import { registerServiceWorker } from '@/lib/pwa';
 import { refreshAiKeyStatus, refreshSharedKey } from '@/lib/ai';
 import { refreshFriendsActivity, touchLastSeen } from './presence';
 import { syncStatus } from './status';
+import { acceptPendingInvite } from './invite';
 
 export function AppBootstrap() {
   const onboarded = useDB((s) => !!s.tables.athlete_profiles[s.userId]?.onboarding_completed);
@@ -59,6 +60,7 @@ function useAutoSync() {
       void refreshFriendsActivity();
       void refreshSharedKey();
       void syncStatus();
+      void acceptPendingInvite();
     };
     run();
     void refreshAiKeyStatus();

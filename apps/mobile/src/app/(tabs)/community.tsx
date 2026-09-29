@@ -57,6 +57,7 @@ export default function Community() {
               Diese Installation läuft ohne Server (lokaler Modus). Für die Community muss ein Supabase-Projekt verbunden werden (siehe README – der Free-Plan reicht).
             </Text>
           )}
+          <Button title="App mit Freunden teilen" icon="share-social-outline" variant="secondary" style={{ marginTop: spacing.sm }} onPress={() => router.push('/community/invite')} testID="open-invite" />
         </Card>
       </Screen>
     );
@@ -84,7 +85,12 @@ export default function Community() {
   if (!me?.username) return <UsernameSetup me={me} userId={account} onDone={loadMe} />;
 
   return (
-    <Screen title="Community" subtitle={`${me.avatar_emoji} @${me.username}`} tabBarPadding testID="community-screen" right={<Button title="Profil" size="sm" variant="secondary" onPress={() => setMe({ ...me, username: null })} />}>
+    <Screen title="Community" subtitle={`${me.avatar_emoji} @${me.username}`} tabBarPadding testID="community-screen" right={
+        <Row gap={spacing.sm}>
+          <Button title="Einladen" icon="person-add-outline" size="sm" onPress={() => router.push('/community/invite')} testID="open-invite" />
+          <Button title="Profil" size="sm" variant="secondary" onPress={() => setMe({ ...me, username: null })} />
+        </Row>
+      }>
       <Segmented
         testIDPrefix="community-tab"
         options={[
@@ -270,6 +276,18 @@ function Friends() {
 
   return (
     <>
+      <Card variant="accent" padding={spacing.md} onPress={() => router.push('/community/invite')} testID="invite-card" accessibilityLabel="Freunde einladen">
+        <Row>
+          <Text variant="h2">📲</Text>
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyMedium">Freunde einladen</Text>
+            <Text variant="small" tone="secondary">
+              Per WhatsApp, Link oder QR-Code – ihr seid sofort befreundet
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Row>
+      </Card>
       <Input placeholder="Freunde suchen (Benutzername)" value={q} onChangeText={setQ} autoCapitalize="none" testID="friend-search" />
       {results.map((r) => (
         <Card key={r.id} padding={spacing.md}>

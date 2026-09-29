@@ -87,7 +87,7 @@ export function DailyBriefing({ t }: { t: Today }) {
             ))
           ) : (
             <Text variant="small" tone="secondary">
-              Füge deine Tester unter Community als Freunde hinzu – dann siehst du hier, wann sie zuletzt online waren.
+              Lade deine Tester ein (Community → Einladen) – dann siehst du hier, wann sie zuletzt online waren und ihren Status.
             </Text>
           )}
         </View>

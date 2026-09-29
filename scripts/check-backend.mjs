@@ -29,6 +29,7 @@ const checks = [
   ['Lauf & EMS', 'table', 'cardio_sessions', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
   ['Gemeinsamer KI-Schlüssel', 'rpc', 'get_shared_ai_key', 'Update-SQL (supabase/updates/2026-09-29.sql)'],
   ['Status-Meldungen', 'rpc', 'set_status', 'Update-SQL (supabase/updates/2026-09-30-status.sql)', { p_emoji: null, p_text: null }],
+  ['Freunde einladen', 'rpc', 'my_invite_code', 'Update-SQL (supabase/updates/2026-09-30-invites.sql)'],
 ];
 let missing = 0;
 const results = [];

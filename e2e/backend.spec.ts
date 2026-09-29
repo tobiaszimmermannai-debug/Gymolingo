@@ -264,3 +264,41 @@ test('progress photo is uploaded to the private bucket and visible on a second d
   await expect(b.getByTestId('onboarding-start')).toBeVisible();
   expect((await b.request.get(signed)).ok()).toBe(false);
 });
+
+test('invite link / QR: a new user becomes a friend right after sign-up', async ({ page, browser }) => {
+  const a = page;
+  await register(a, 'Ina', `ina-${run}@example.com`);
+  await a.goto('/community/invite');
+  const link = (await a.getByTestId('invite-url').textContent())!;
+  expect(link).toMatch(/\/invite\?c=[0-9a-f]{12}$/);
+  await expect(a.getByTestId('invite-qr').locator('path')).toHaveCount(1);
+
+  // Carl opens the link on his phone (no app yet)
+  const c = await newPage(browser);
+  await c.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+  await expect(c.getByTestId('invite-from')).toHaveText('Ina lädt dich ein');
+  await c.getByTestId('invite-start').click();
+  await completeOnboarding(c, { name: 'Carl' });
+  await expect(c.getByTestId('invite-pending')).toContainText('Ina hat dich eingeladen');
+  await c.getByTestId('invite-pending-signup').click();
+  await c.getByTestId('auth-email').fill(`carl-${run}@example.com`);
+  await c.getByTestId('auth-password').fill(pw);
+  await c.getByTestId('auth-submit').click();
+  await expect(c.getByTestId('home-screen')).toBeVisible();
+  await expect(c.getByTestId('invite-joined')).toContainText('Du und Ina seid jetzt Freunde');
+  await expect(c.getByTestId('briefing-friends')).toContainText('Ina');
+
+  // Ina sees Carl without accepting anything; renewing the link invalidates the old one
+  await a.goto('/');
+  await a.getByTestId('tab-community').click();
+  await a.getByTestId('username-input').fill(`ina_${run}`);
+  await a.getByTestId('save-username').click();
+  await a.getByTestId('community-tab-friends').click();
+  await expect(a.getByTestId('community-screen')).toContainText('Carl');
+  await a.goto('/community/invite');
+  a.once('dialog', (d) => d.accept());
+  await a.getByTestId('invite-renew').click();
+  await expect(a.getByTestId('invite-url')).not.toHaveText(link);
+  await c.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+  await expect(c.getByTestId('invite-invalid')).toBeVisible();
+});

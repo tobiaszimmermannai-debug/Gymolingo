@@ -58,6 +58,10 @@ export interface DBState {
     aiBlocks?: Record<string, string>;
     /** friends' "zuletzt online" and fun status for the coach briefing */
     friendsActivity?: { fetchedAt: string; rows: FriendActivity[] };
+    /** invite code from an opened invite link, accepted automatically once signed in */
+    pendingInvite?: string | null;
+    /** who we just became friends with via an invite (success card on Home) */
+    inviteJoined?: { name: string; emoji: string } | null;
     /** own fun status ("🥤 Monster Zero White intus"); pending = not yet on the server */
     status?: { emoji: string; text: string; until: string | null; pending?: boolean } | null;
   };
