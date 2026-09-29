@@ -41,7 +41,7 @@ export interface DBState {
     aiKey?: { configured: boolean; hint: string | null; fallback: boolean };
     /** Gemini key stored on this device only (never synced) */
     geminiKey?: string;
-    /** key shared by the group owner (Supabase, owner + friends) */
+    /** key shared by the owner with all signed-in users (Supabase) */
     sharedAi?: { key: string; hint: string; ownerName: string; isOwner: boolean } | null;
     /** on-device AI limits: requests today, models blocked after a quota answer (ISO until) */
     aiUsage?: { day: string; count: number };

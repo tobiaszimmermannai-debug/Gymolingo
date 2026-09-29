@@ -71,5 +71,5 @@ test('Gemini key on the device: coach, body fat from photos, daily limit display
   // key can be removed again
   page.once('dialog', (d) => d.accept());
   await page.getByTestId('ai-key-delete').click();
-  await expect(page.getByTestId('ai-key-status')).toContainText('Noch kein Schlüssel');
+  await expect(page.getByTestId('ai-key-status')).toContainText('Noch keine KI aktiv');
 });

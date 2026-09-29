@@ -130,7 +130,7 @@ Letzte Aktualisierung: 2026-09-28
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
 - Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.
 - Einrichtung vereinfacht (Nutzer kam mit Secrets/Tokens nicht zurecht): `supabase/setup.sql` (aus Migrationen generiert, CI prüft Aktualität) im SQL Editor ausführen; öffentliche URL/Key in `config/backend.env`; Pages 1 Klick.
-- **Ein Gemini-Schlüssel für die Gruppe**: Besitzer gibt seinen Geräte-Schlüssel frei (`shared_ai_key`, `set_shared_ai_key`/`get_shared_ai_key`), alle akzeptierten Freunde erhalten ihn automatisch (Limit 25/Person/Tag bleibt).
+- **Ein Gemini-Schlüssel für alle** (Nutzerwunsch): Besitzer gibt seinen Geräte-Schlüssel frei (`shared_ai_key`, `set_shared_ai_key`/`get_shared_ai_key`), **alle angemeldeten Nutzer** erhalten ihn automatisch (Limit 25/Person/Tag bleibt; Migration 08).
 - „Zuletzt online“: `profiles.last_seen_at`, `touch_last_seen()`, `friends_activity()` (nur Freunde, abschaltbar via `share_online_status`), Anzeige im **Tagesbriefing** auf Home.
 - Edge Functions prüfen den Nutzer selbst (`verify_jwt = false`, `auth.getUser`) – kompatibel mit neuen Supabase-Signaturschlüsseln; `apikey` wird aus der Anfrage übernommen.
 - App-Icon blau (Verlauf #3B82F6→#1D4ED8, weißes G); App-Oberfläche bleibt Anthrazit/Lime.
@@ -145,6 +145,6 @@ Letzte Aktualisierung: 2026-09-28
 - Stand „Ausdauer & EMS, Gruppen-Schlüssel, Privatsphäre-Voreinstellung": core 126/126, DB 61/61, Edge 38/38, E2E lokal 14/14, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. **Supabase verbunden** (`config/backend.env`: ozjugovffdktizmmsvgm). Deploy-Check (`scripts/check-backend.mjs`, Annotations im Workflow) meldet: E-Mail-Bestätigung aus ✅, aber **Tabellen fehlen** → Nutzer muss `supabase/setup.sql` im SQL Editor ausführen; danach Deploy PWA erneut laufen lassen und Annotations prüfen.
+1. **Supabase verbunden** (`config/backend.env`: ozjugovffdktizmmsvgm). Deploy-Check (`scripts/check-backend.mjs`, Annotations im Workflow) meldet: E-Mail-Bestätigung aus ✅, aber **Tabellen fehlen** → Nutzer muss `supabase/setup.sql` (vollständig, 10 Migrationen) im SQL Editor ausführen – er hatte versehentlich das Update-SQL genommen (Fehler „schema private does not exist“); danach Deploy PWA erneut laufen lassen und Annotations prüfen.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(8);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('b1b1b1b1-0000-0000-0000-000000000001', 'k-owner@example.com', '{"display_name":"Tobi"}'),
@@ -21,8 +21,12 @@ select is((select owner_name from public.get_shared_ai_key()), 'Tobi', 'with the
 select throws_ok($$select public.set_shared_ai_key('AIzaSyOtherKey000000000000000zzzz')$$, 'P0001', null, 'friend cannot overwrite it');
 
 select set_config('request.jwt.claims', '{"sub":"b1b1b1b1-0000-0000-0000-000000000003","role":"authenticated"}', true);
-select is((select count(*)::int from public.get_shared_ai_key()), 0, 'non-friends get nothing');
+select is((select gemini_key from public.get_shared_ai_key()), 'AIzaSyOwnerKey000000000000000abcd', 'every signed-in user gets the key (no friendship needed)');
 select throws_ok($$select * from public.shared_ai_key$$, '42501', null, 'no direct table access');
+
+reset role;
+set local role anon;
+select throws_ok($$select * from public.get_shared_ai_key()$$, '42501', null, 'not without an account');
 
 select * from finish();
 rollback;

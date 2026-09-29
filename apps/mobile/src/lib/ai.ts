@@ -116,7 +116,7 @@ export function removeDeviceKey() {
 }
 
 // ---------------------------------------------------------------- key shared with friends (Supabase)
-/** Loads the group key (owner + accepted friends). */
+/** Loads the key the owner shared with all signed-in users. */
 export async function refreshSharedKey() {
   if (!AI_ENABLED || !supabase || !useDB.getState().accountUserId) return;
   const { data, error } = await supabase.rpc('get_shared_ai_key');
@@ -125,8 +125,8 @@ export async function refreshSharedKey() {
   setPrefs({ sharedAi: row ? { key: row.gemini_key, hint: row.hint, ownerName: row.owner_name, isOwner: row.is_owner } : null });
 }
 
-/** Shares this device's key with all of the user's friends. */
-export async function shareKeyWithFriends() {
+/** Shares this device's key with all signed-in users of the project. */
+export async function shareKeyWithAll() {
   const key = useDB.getState().prefs.geminiKey;
   if (!supabase || !key) throw new AiError('Zuerst einen Schlüssel auf diesem Gerät speichern.', 'failed');
   const { error } = await supabase.rpc('set_shared_ai_key', { p_key: key });
