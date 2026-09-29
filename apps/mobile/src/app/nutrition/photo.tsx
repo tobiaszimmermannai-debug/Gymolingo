@@ -10,7 +10,7 @@ import { Button, IconButton } from '@/ui/Button';
 import { Input, parseDecimal } from '@/ui/Input';
 import { Badge, ChipGroup } from '@/ui/Chip';
 import { colors, radius, spacing } from '@/ui/theme';
-import { aiAvailability, analyzeMealPhoto, AiError, type PhotoEstimateItem } from '@/lib/ai';
+import { analyzeMealPhoto, AiError, useAiAvailability, type PhotoEstimateItem } from '@/lib/ai';
 import { prepareForAi } from '@/lib/imageResize';
 import { insertMany, nowISO } from '@/data/store';
 import { requestSync } from '@/data/sync';
@@ -30,7 +30,7 @@ export default function PhotoMeal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [m, setM] = useState<MealType>(meal as MealType);
-  const availability = aiAvailability();
+  const availability = useAiAvailability();
 
   const pick = async (camera: boolean) => {
     setError(null);
@@ -94,15 +94,18 @@ export default function PhotoMeal() {
     return (
       <Screen title="Foto-Erkennung" back>
         <Card>
-          <Text variant="h3">{availability === 'disabled' ? 'KI-Fotoerkennung ist deaktiviert' : 'KI-Fotoerkennung benötigt ein Konto'}</Text>
+          <Text variant="h3">{availability === 'disabled' ? 'KI-Fotoerkennung ist deaktiviert' : availability === 'no_key' ? 'Gemini-Schlüssel fehlt' : 'KI-Fotoerkennung benötigt ein Konto'}</Text>
           <Text tone="secondary" style={{ marginTop: 6 }}>
             {availability === 'disabled'
               ? 'Diese Installation läuft im kostenlosen Modus ohne KI-Dienst. Nutze Suche, Barcode oder Schnelleintrag.'
+              : availability === 'no_key'
+              ? 'Hinterlege einmalig deinen eigenen, kostenlosen Gemini-Schlüssel – dann schätzt die KI Mahlzeiten aus Fotos.'
               : availability === 'no_backend'
               ? 'Diese Installation ist ohne Server konfiguriert. Die Fotoanalyse läuft serverseitig (der API-Schlüssel liegt nie in der App).'
               : 'Melde dich an bzw. erstelle ein Konto, um Mahlzeiten per Foto schätzen zu lassen.'}
           </Text>
           {availability === 'no_account' && <Button title="Konto erstellen / anmelden" style={{ marginTop: spacing.md }} onPress={() => router.push('/auth')} />}
+          {availability === 'no_key' && <Button title="Schlüssel einrichten" style={{ marginTop: spacing.md }} onPress={() => router.push('/settings/ai')} />}
           <Button title="Stattdessen Schnelleintrag" variant="secondary" style={{ marginTop: spacing.sm }} onPress={() => router.replace(`/nutrition/quick?date=${date}&meal=${m}`)} />
         </Card>
       </Screen>

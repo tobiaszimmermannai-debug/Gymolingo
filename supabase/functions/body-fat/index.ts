@@ -3,7 +3,8 @@
  * Explicitly an estimate (typical error ±3–5 percentage points): the app shows
  * a range and the user decides whether to save it. Photos are not stored here.
  */
-import { describeError, generate, geminiKey, type Part } from '../_shared/gemini.ts';
+import { describeError, generateVision, type Part } from '../_shared/gemini.ts';
+import { resolveGeminiKey } from '../_shared/userKey.ts';
 import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { userClient } from '../_shared/userData.ts';
@@ -43,8 +44,8 @@ Deno.serve(async (req) => {
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return json({ error: 'Nicht angemeldet' }, 401);
 
-  const key = geminiKey();
-  if (!key) return json({ error: 'Die KI-Schätzung ist auf dem Server nicht konfiguriert (GEMINI_API_KEY fehlt).', code: 'not_configured' }, 501);
+  const key = await resolveGeminiKey(sb, auth.user.id);
+  if (!key) return json({ error: 'Hinterlege deinen kostenlosen Gemini-Schlüssel unter Einstellungen → KI.', code: 'no_key' }, 501);
 
   let body: { images?: { data?: string; mediaType?: string; pose?: string }[] };
   try {
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
   parts.push({ text: facts.length ? `Angaben: ${facts.join(', ')}.` : 'Keine weiteren Angaben.' });
 
   try {
-    const r = await generate(key, { system: SYSTEM, jsonSchema: SCHEMA, temperature: 0.2, contents: [{ role: 'user', parts }] });
+    const r = await generateVision(key, { system: SYSTEM, jsonSchema: SCHEMA, temperature: 0.2, contents: [{ role: 'user', parts }] });
     if (r.blocked || !r.text) return json({ error: 'Die Fotos konnten nicht ausgewertet werden. Nutze alternativ die Berechnung aus deinen Körpermaßen.' }, 422);
     const o = JSON.parse(r.text) as Record<string, unknown>;
     const clamp = (v: unknown) => Math.round(Math.max(3, Math.min(60, Number(v) || 0)) * 10) / 10;

@@ -35,6 +35,8 @@ export interface DBState {
     friendsCount?: number;
     /** user agreed that progress photos may be sent to the AI (Gemini) for body fat estimates */
     aiPhotoConsent?: boolean;
+    /** server-side status of the personal Gemini key (the key itself never comes back) */
+    aiKey?: { configured: boolean; hint: string | null; fallback: boolean };
   };
 }
 

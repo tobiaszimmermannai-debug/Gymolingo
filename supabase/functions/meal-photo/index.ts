@@ -3,7 +3,8 @@
  * The result is explicitly an estimate – the app stores it with is_estimate = true
  * and lets the user correct amounts. The photo is not stored.
  */
-import { describeError, generate, geminiKey } from '../_shared/gemini.ts';
+import { describeError, generateVision } from '../_shared/gemini.ts';
+import { resolveGeminiKey } from '../_shared/userKey.ts';
 import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { userClient } from '../_shared/userData.ts';
@@ -52,8 +53,8 @@ Deno.serve(async (req) => {
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return json({ error: 'Nicht angemeldet' }, 401);
 
-  const key = geminiKey();
-  if (!key) return json({ error: 'Die KI-Fotoerkennung ist auf dem Server nicht konfiguriert (GEMINI_API_KEY fehlt).', code: 'not_configured' }, 501);
+  const key = await resolveGeminiKey(sb, auth.user.id);
+  if (!key) return json({ error: 'Hinterlege deinen kostenlosen Gemini-Schlüssel unter Einstellungen → KI.', code: 'no_key' }, 501);
 
   let body: { image?: string; mediaType?: string; hint?: string };
   try {
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
   if (!(await consumeAiQuota(sb).catch(() => false))) return json({ error: 'Tageslimit für KI-Anfragen erreicht – bitte morgen wieder oder manuell eintragen.' }, 429);
 
   try {
-    const r = await generate(key, {
+    const r = await generateVision(key, {
       system: SYSTEM,
       jsonSchema: SCHEMA,
       temperature: 0.2,

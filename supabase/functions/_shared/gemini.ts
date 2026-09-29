@@ -1,9 +1,12 @@
 /**
  * Google Gemini client for the edge functions (REST, no SDK needed).
- * The key only exists as a Supabase secret (`supabase secrets set GEMINI_API_KEY=...`),
- * never in the app. Model via GEMINI_MODEL (default: the auto-updated Flash alias).
+ * Keys: each user's own free key (see userKey.ts) or an optional shared
+ * GEMINI_API_KEY secret – never in the app.
+ * Models (auto-updated aliases): Flash-Lite for text (large free quota),
+ * Flash for photo analysis with automatic fallback to Flash-Lite.
  */
-export const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-flash-latest';
+export const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-flash-lite-latest';
+export const VISION_MODEL = Deno.env.get('GEMINI_VISION_MODEL') ?? 'gemini-flash-latest';
 const BASE = Deno.env.get('GEMINI_API_BASE') ?? 'https://generativelanguage.googleapis.com';
 
 export type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
@@ -36,8 +39,9 @@ function toGeminiSchema(s: unknown): unknown {
  */
 export async function generate(
   key: string,
-  p: { system: string; contents: Turn[]; jsonSchema?: Record<string, unknown>; temperature?: number; maxOutputTokens?: number; timeoutMs?: number },
+  p: { system: string; contents: Turn[]; jsonSchema?: Record<string, unknown>; temperature?: number; maxOutputTokens?: number; timeoutMs?: number; model?: string },
 ): Promise<{ text: string | null; model: string; blocked: boolean }> {
+  const model = p.model ?? MODEL;
   const generationConfig: Record<string, unknown> = { temperature: p.temperature ?? 0.4, maxOutputTokens: p.maxOutputTokens ?? 4096 };
   if (p.jsonSchema) {
     generationConfig.responseMimeType = 'application/json';
@@ -45,7 +49,7 @@ export async function generate(
   }
   let res: Response;
   try {
-    res = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+    res = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: p.system }] }, contents: p.contents, generationConfig }),
@@ -67,17 +71,39 @@ export async function generate(
     if (res.status === 400) throw new GeminiError(`Ungültige KI-Anfrage: ${msg}`, 400, 'bad_request');
     throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}).`, 502, 'unavailable');
   }
-  const model = body.modelVersion ?? MODEL;
-  if (body.promptFeedback?.blockReason) return { text: null, model, blocked: true };
+  const used = body.modelVersion ?? model;
+  if (body.promptFeedback?.blockReason) return { text: null, model: used, blocked: true };
   const cand = body.candidates?.[0];
   const reason = cand?.finishReason ?? '';
-  if (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'IMAGE_SAFETY', 'RECITATION'].includes(reason)) return { text: null, model, blocked: true };
+  if (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'IMAGE_SAFETY', 'RECITATION'].includes(reason)) return { text: null, model: used, blocked: true };
   const text = (cand?.content?.parts ?? [])
     .filter((x) => !x.thought && typeof x.text === 'string')
     .map((x) => x.text)
     .join('')
     .trim();
-  return { text: text || null, model, blocked: false };
+  return { text: text || null, model: used, blocked: false };
+}
+
+/** Photo analysis: better vision model first, Flash-Lite when its free quota is used up. */
+export async function generateVision(key: string, p: Parameters<typeof generate>[1]) {
+  try {
+    return await generate(key, { ...p, model: VISION_MODEL });
+  } catch (e) {
+    if (e instanceof GeminiError && e.code === 'rate_limited' && VISION_MODEL !== MODEL) return generate(key, { ...p, model: MODEL });
+    throw e;
+  }
+}
+
+/** Checks a key with a cheap metadata request (no tokens used). */
+export async function validateKey(key: string): Promise<'ok' | 'invalid' | 'unavailable'> {
+  try {
+    const res = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(MODEL)}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
+    if (res.ok || res.status === 429) return 'ok';
+    if ([400, 401, 403].includes(res.status)) return 'invalid';
+    return 'unavailable';
+  } catch {
+    return 'unavailable';
+  }
 }
 
 export function describeError(e: unknown): { status: number; message: string } {

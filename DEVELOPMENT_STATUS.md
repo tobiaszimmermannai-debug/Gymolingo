@@ -16,7 +16,7 @@ Letzte Aktualisierung: 2026-09-28
 | Daten | Local-first Zustand-Store (`apps/mobile/src/data`), persistiert in SQLite-KV (nativ) / IndexedDB (Web) |
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions), RLS auf allen Tabellen |
 | Sync | Outbox + Pull-Cursor (`server_updated_at`), Last-Write-Wins auf `updated_at` (Client + DB-Trigger), Soft-Deletes |
-| KI | **Google Gemini** (REST, `gemini-flash-latest`), standardmäßig aus. Nur serverseitig (Edge Functions, `GEMINI_API_KEY` als Secret, `EXPO_PUBLIC_AI_ENABLED=true`), Tageslimit pro Nutzer (`ai_usage`). Ohne KI: regelbasierter Coach auf dem Gerät. Statistiken immer aus `@gymolingo/core` |
+| KI | **Google Gemini** (REST; Flash-Lite für Text, Flash für Fotos mit Fallback), **eigener Gratis-Schlüssel pro Nutzer** (verschlüsselt in `ai_keys`, Edge Function `ai-key`), Tageslimit pro Nutzer (`ai_usage`). Ohne KI: regelbasierter Coach auf dem Gerät. Statistiken immer aus `@gymolingo/core` |
 | Lebensmittel | Eigene deutsche Basis-DB (~140 Einträge, Durchschnittswerte) + Open Food Facts (Suche, Barcode) + eigene Lebensmittel/Rezepte |
 | Tests | Vitest (core), pgTAP via psql (`scripts/test-db.sh`), Playwright E2E gegen den Web-Build |
 
@@ -59,7 +59,7 @@ Letzte Aktualisierung: 2026-09-28
 ### 5. Gewicht, Schritte, Body
 - ✅ Schnelle Gewichtseingabe, Tageswert, 7-Tage-Schnitt, 30-Tage-Trend, Körperfett
 - ✅ Körpermaße mit Verlauf
-- ✅ KFA-Schätzung: Navy-Formel aus Maßen (core, getestet) + KI aus bis zu 3 Fortschrittsfotos (Einwilligung, Spanne, Sicherheit), Übernahme als markierte Schätzung (~)
+- ✅ KFA-Schätzung aus Fotos (KI, startet automatisch nach neuem Foto; Einwilligung, Spanne, Sicherheit) + Navy-Formel als Alternative; Übernahme als markierte Schätzung (~)
 - ✅ Fortschrittsbilder (lokal + privater Storage-Bucket, Cloud-Symbol nach Upload) – E2E: Upload, Anzeige auf Zweitgerät per Signed URL, nicht öffentlich, Löschung mit Konto
 - ✅ Abendlicher Check-in mit Schrittzahl (manuell)
 - 🟩 Apple Health / Health Connect: Abstraktion, Adapter, Einstellungs-Schalter vorbereitet (`src/lib/health`), Aktivierung siehe `docs/HEALTH_INTEGRATION.md` (benötigt Dev-Build, nicht getestet)
@@ -84,7 +84,7 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
 - ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
-- ✅ Edge Functions `coach`, `meal-photo`, `body-fat` auf Gemini (JSON-Schema, Safety/429-Fallback, Tageslimit) – 22 Checks gegen lokales Supabase + Mock-Gemini
+- ✅ Edge Functions `coach`, `meal-photo`, `body-fat`, `ai-key` auf Gemini (persönliche Schlüssel, JSON-Schema, Safety/429-Fallback, Flash→Flash-Lite, Tageslimit) – 33 Checks gegen lokales Supabase + Mock-Gemini
 
 ### 10. Progress-Dashboard
 - ✅ Zeiträume 7T/30T/90T/6M/1J/Alles, Vergleich zur Vorperiode, Gewicht, Kraft, Volumen, Muskelgruppen, Kalorien, Protein, Schritte, Serien, PRs
@@ -98,10 +98,10 @@ Letzte Aktualisierung: 2026-09-28
 
 ### 12. Tests
 - ✅ core: 106 Unit-Tests (Vitest)
-- ✅ DB: 37 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Tageslimit)
-- ✅ Edge Functions: 22 Checks (`npm run test:edge`)
+- ✅ DB: 41 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Tageslimit, KI-Schlüssel)
+- ✅ Edge Functions: 33 Checks (`npm run test:edge`)
 - ✅ E2E lokal (12, inkl. KFA Navy): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (6): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync, Fortschrittsbilder, KI-KFA (gemockte Function)
+- ✅ E2E Backend (6): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync, Fortschrittsbilder, KI-Schlüssel einrichten + KI-KFA aus Fotos (gemockte Functions)
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -110,7 +110,8 @@ Letzte Aktualisierung: 2026-09-28
 |---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `apps/mobile/.env` | Konto, Sync, Community (ohne: lokaler Modus). Free-Plan reicht |
 | `EXPO_PUBLIC_AI_ENABLED` | `apps/mobile/.env` | `true` schaltet KI-Funktionen ein – **kostenpflichtig**, Standard `false` |
-| `GEMINI_API_KEY` | Supabase Secret / GitHub Secret | KI-Coach, KI-Wochenbericht, Mahlzeitfoto, KFA aus Fotos (ohne: regelbasierter Coach) |
+| Eigener Gemini-Schlüssel | App → Einstellungen → KI (pro Person) | KI-Coach, Wochenbericht, Mahlzeitfoto, KFA aus Fotos (ohne: regelbasierter Coach) |
+| `AI_KEY_SECRET` | Supabase Secret (vom Deploy-Workflow erzeugt) | Verschlüsselung der persönlichen Schlüssel |
 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, Variablen `SUPABASE_PROJECT_REF/URL/ANON_KEY` | GitHub Actions | Deploy von Backend und PWA (siehe `docs/KOSTENLOS_BETREIBEN.md`) |
 | EAS `projectId` | `app.json` | nur für Server-Push-Tokens (optional) |
 
@@ -121,7 +122,9 @@ Letzte Aktualisierung: 2026-09-28
 
 ## Entscheidungen
 - **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
-- **KI = Google Gemini** (Nutzerwunsch). Achtung Nutzungsbedingungen: für Nutzer im EWR/CH/UK verlangt Google „Paid Services“ (Abrechnungskonto) → Tageslimit `AI_DAILY_LIMIT`, Budget-Alarm empfohlen.
+- **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
+- App-Icon blau (Verlauf #3B82F6→#1D4ED8, weißes G); App-Oberfläche bleibt Anthrazit/Lime.
+- KFA: primär aus Fotos (startet automatisch nach neuem Foto, Einwilligung einmalig), Navy-Formel als Alternative ohne KI.
 - Hosting der PWA auf GitHub Pages (Repo öffentlich) mit `EXPO_BASE_URL=/Gymolingo`; `scripts/pwa-base.mjs` passt index.html/Manifest an und legt 404.html als SPA-Fallback an.
 - Trends/PRs/Plateaus mit reinem Epley-e1RM; RIR-bereinigter e1RM nur für die Größe von Gewichtssprüngen. Kraftveränderung = Median der Sitzungsbestwerte.
 - Wochenbericht wird live aus den Daten berechnet; gespeichert nur, wenn die Woche Daten hat; KI-Text bleibt, bis er erzwungen neu erzeugt wird.
@@ -129,9 +132,9 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Gemini, KFA, GitHub Pages": core 106/106, DB 37/37, Edge 22/22, E2E lokal 12/12, E2E Backend 6/6, Typecheck grün.
+- Stand „Eigene Gemini-Schlüssel, blaues Icon": core 106/106, DB 41/41, Edge 33/33, E2E lokal 12/12, E2E Backend 6/6, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. Nutzer richtet Supabase/Gemini/Pages ein (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
+1. Nutzer richtet Supabase + GitHub ein (Pages macht er später) (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

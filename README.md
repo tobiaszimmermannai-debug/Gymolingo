@@ -64,7 +64,7 @@ Das Logo liegt als Vektor in `assets-src/mark.svg`. Nach Änderungen `node scrip
 ```bash
 npm test                    # 106 Unit-Tests der Domänenlogik (Vitest)
 npm run test:db             # pgTAP: RLS, Last-Write-Wins, Community, Privatsphäre, KI-Tageslimit (lokales Supabase nötig)
-npm run test:edge           # Edge Functions (Coach, Mahlzeitfoto, KFA) gegen lokales Supabase + simulierte Gemini-API
+npm run test:edge           # Edge Functions (Coach, Mahlzeitfoto, KFA, KI-Schlüssel) gegen lokales Supabase + simulierte Gemini-API
 npm run build:web:test && npx playwright test --project=local        # E2E ohne Backend (inkl. PWA-Offline)
 npm run build:web:backend && npx playwright test --project=backend   # E2E mit lokalem Supabase
 npm run typecheck
@@ -76,18 +76,20 @@ npm run typecheck
 |---|---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `apps/mobile/.env` | leer → lokaler Modus | Konto, Sync, Community |
 | `EXPO_PUBLIC_AI_ENABLED` | `apps/mobile/.env` | `false` | KI-Coach, Foto-Erkennung, KFA aus Fotos (siehe unten) |
-| `GEMINI_API_KEY` | Supabase Secret | – | nur wenn KI aktiviert |
-| `GEMINI_MODEL` / `AI_DAILY_LIMIT` | Supabase Secret | `gemini-flash-latest` / `30` | Modell, KI-Anfragen pro Nutzer und Tag |
+| Eigener Gemini-Schlüssel | App → Einstellungen → KI | – | kostenlos pro Person, verschlüsselt gespeichert |
+| `AI_KEY_SECRET` | Supabase Secret | vom Deploy-Workflow erzeugt | Verschlüsselung der persönlichen Schlüssel |
+| `GEMINI_MODEL` / `GEMINI_VISION_MODEL` / `AI_DAILY_LIMIT` | Supabase Secret | `gemini-flash-lite-latest` / `gemini-flash-latest` / `40` | Modelle, KI-Anfragen pro Nutzer und Tag |
+| `GEMINI_API_KEY` | Supabase Secret | – | optionaler gemeinsamer Schlüssel (nur mit Abrechnung) |
 | `EXPO_BASE_URL` | Build-Umgebung | – | Unterordner fürs Hosting (GitHub Pages: `/Gymolingo`) |
 | `EXPO_PUBLIC_DEV_TOOLS` | Build-Umgebung | `false` | Demo-Daten-Button (nur Entwicklung/Tests) |
 
-### Optional: KI aktivieren (Google Gemini)
+### Optional: KI aktivieren (Google Gemini, kostenlos per eigenem Schlüssel)
 ```bash
-npx supabase secrets set GEMINI_API_KEY=...           # Schlüssel nie in die App!
-npx supabase functions deploy coach meal-photo body-fat
+npx supabase secrets set AI_KEY_SECRET="$(openssl rand -base64 32)"
+npx supabase functions deploy coach meal-photo body-fat ai-key
 echo "EXPO_PUBLIC_AI_ENABLED=true" >> apps/mobile/.env
 ```
-Oder per GitHub Actions (Secret `GEMINI_API_KEY`, Variable `AI_ENABLED=true`) – siehe [docs/KOSTENLOS_BETREIBEN.md](docs/KOSTENLOS_BETREIBEN.md), dort auch die Hinweise zu den Gemini-Nutzungsbedingungen.
+Danach hinterlegt jede Person in der App unter *Einstellungen → KI* ihren eigenen Gratis-Schlüssel. Per GitHub Actions erledigt der Workflow das automatisch – siehe [docs/KOSTENLOS_BETREIBEN.md](docs/KOSTENLOS_BETREIBEN.md).
 
 ## Technische Entscheidungen
 - **Local-first:** jede Eingabe wird sofort lokal gespeichert (SQLite-KV nativ, IndexedDB im Web) und im Hintergrund synchronisiert – Training im Keller ohne Netz funktioniert.

@@ -13,7 +13,7 @@ import { useRows } from '@/data/hooks';
 import { remove } from '@/data/store';
 import { requestSync } from '@/data/sync';
 import { sendCoachMessage, useCoachContext } from '@/features/coach';
-import { aiAvailability } from '@/lib/ai';
+import { useAiAvailability } from '@/lib/ai';
 import { confirm } from '@/lib/dialog';
 
 const SUGGESTIONS = ['Was trainiere ich heute?', 'Wie viel Protein fehlt mir heute?', 'Wie ist mein Gewichtstrend?', 'Wie steigere ich meine Gewichte?', 'Tipps für mehr Schritte'];
@@ -25,7 +25,8 @@ export default function Coach() {
   const [busy, setBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
   const sorted = useMemo(() => [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at)), [messages]);
-  const ai = aiAvailability() === 'ok';
+  const availability = useAiAvailability();
+  const ai = availability === 'ok';
 
   const send = async (q: string) => {
     const msg = q.trim();
@@ -40,12 +41,13 @@ export default function Coach() {
   return (
     <Screen
       title="Coach"
-      subtitle={ai ? 'KI-Coach · nutzt nur deine gespeicherten Daten' : 'Dein Coach · rechnet mit deinen echten Daten'}
+      subtitle={ai ? 'KI-Coach · nutzt nur deine gespeicherten Daten' : availability === 'no_key' ? 'Ohne KI · ✨ oben rechts: KI kostenlos aktivieren' : 'Dein Coach · rechnet mit deinen echten Daten'}
       back
       scroll={false}
       testID="coach-screen"
       right={
         <Row gap={spacing.sm}>
+          {availability === 'no_key' && <IconButton icon="sparkles-outline" accessibilityLabel="KI aktivieren (eigener Gemini-Schlüssel)" testID="coach-enable-ai" onPress={() => router.push('/settings/ai')} />}
           <IconButton icon="document-text-outline" accessibilityLabel="Wochenbericht" testID="open-report" onPress={() => router.push('/coach/report')} />
           {sorted.length > 0 && (
             <IconButton

@@ -13,11 +13,13 @@ import { confirm, notify } from '@/lib/dialog';
 import { ToggleRow } from '@/ui/Toggle';
 import { setPrefs } from '@/data/store';
 import { getHealthProvider, syncHealthSteps } from '@/lib/health';
+import { AI_ENABLED } from '@/lib/config';
 
 const ITEMS: { route: string; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; testID: string }[] = [
   { route: '/settings/profile', icon: 'person-outline', title: 'Profil & Ziele', sub: 'Körperdaten, Ziel, Kalorien & Makros, Trainingsplan', testID: 'settings-profile' },
   { route: '/settings/reminders', icon: 'notifications-outline', title: 'Erinnerungen', sub: 'Zeiten, Ruhezeiten, Kategorien, Intensität', testID: 'settings-reminders' },
   { route: '/settings/privacy', icon: 'lock-closed-outline', title: 'Datenschutz & Teilen', sub: 'Was deine Freunde sehen dürfen', testID: 'settings-privacy' },
+  ...(AI_ENABLED ? [{ route: '/settings/ai', icon: 'sparkles-outline' as const, title: 'KI (Google Gemini)', sub: 'Eigener kostenloser Schlüssel für Coach & Foto-Analyse', testID: 'settings-ai' }] : []),
   { route: '/settings/account', icon: 'cloud-outline', title: 'Konto, Sync & Daten', sub: 'Anmeldung, Synchronisierung, Export, Löschung', testID: 'settings-account' },
   { route: '/achievements', icon: 'trophy-outline', title: 'Erfolge & Streak-Schutz', sub: 'Level, Abzeichen, Urlaub/Krankheit pausieren', testID: 'settings-achievements' },
   { route: '/body/measurements', icon: 'body-outline', title: 'Körpermaße & Fotos', sub: 'Umfänge und private Fortschrittsbilder', testID: 'settings-body' },

@@ -1,7 +1,9 @@
-# Deploys database schema (RLS, community, AI quota) and edge functions to a
-# FREE Supabase project. Runs only after the project is configured:
-#   Secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, (optional) GEMINI_API_KEY
+# Deploys database schema (RLS, community, AI quota, personal AI keys) and edge
+# functions to a FREE Supabase project. Runs only after the project is configured:
+#   Secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD
 #   Variables: SUPABASE_PROJECT_REF, (optional) AI_DAILY_LIMIT
+# AI stays free: every user stores their own free Gemini key in the app.
+# (Optional secret GEMINI_API_KEY = shared key for everyone – only with a paid Google account.)
 name: Deploy backend (Supabase)
 on:
   push:
@@ -28,14 +30,17 @@ jobs:
       - run: npm ci
       - run: npx supabase link --project-ref "${{ vars.SUPABASE_PROJECT_REF }}"
       - run: npx supabase db push
-      - run: npx supabase functions deploy coach meal-photo body-fat
-      - name: AI secrets (only if a Gemini key is configured)
+      - run: npx supabase functions deploy coach meal-photo body-fat ai-key
+      - name: AI secrets
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '30' }}
+          AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '40' }}
         run: |
+          # encryption secret for the personal Gemini keys – generated once, never shown
+          if ! npx supabase secrets list | grep -q AI_KEY_SECRET; then
+            npx supabase secrets set AI_KEY_SECRET="$(openssl rand -base64 32)"
+          fi
+          npx supabase secrets set AI_DAILY_LIMIT="$AI_DAILY_LIMIT"
           if [ -n "$GEMINI_API_KEY" ]; then
-            npx supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY" AI_DAILY_LIMIT="$AI_DAILY_LIMIT"
-          else
-            echo "::notice::Kein GEMINI_API_KEY gesetzt – Coach läuft regelbasiert (kostenlos)."
+            npx supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY"
           fi

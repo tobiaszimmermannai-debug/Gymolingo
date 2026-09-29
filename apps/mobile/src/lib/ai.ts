@@ -3,20 +3,28 @@
  * API keys never reach the app – the functions hold GEMINI_API_KEY (Google Gemini).
  */
 import { supabase } from './supabase';
-import { useDB } from '@/data/store';
+import { setPrefs, useDB } from '@/data/store';
 import { AI_ENABLED } from './config';
 
-export type AiAvailability = 'ok' | 'disabled' | 'no_backend' | 'no_account';
+export type AiAvailability = 'ok' | 'disabled' | 'no_backend' | 'no_account' | 'no_key';
 
 export function aiAvailability(): AiAvailability {
   if (!AI_ENABLED) return 'disabled';
   if (!supabase) return 'no_backend';
-  if (!useDB.getState().accountUserId) return 'no_account';
+  const s = useDB.getState();
+  if (!s.accountUserId) return 'no_account';
+  if (!s.prefs.aiKey?.configured && !s.prefs.aiKey?.fallback) return 'no_key';
   return 'ok';
 }
 
+/** Reactive variant for screens. */
+export function useAiAvailability(): AiAvailability {
+  useDB((s) => [s.accountUserId, s.prefs.aiKey?.configured, s.prefs.aiKey?.fallback].join('|'));
+  return aiAvailability();
+}
+
 export class AiError extends Error {
-  constructor(message: string, public code: 'not_configured' | 'unavailable' | 'rate_limited' | 'failed') {
+  constructor(message: string, public code: 'not_configured' | 'no_key' | 'unavailable' | 'rate_limited' | 'failed') {
     super(message);
   }
 }
@@ -33,6 +41,10 @@ async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> 
       payload = null;
     }
     if (payload?.code === 'not_configured') throw new AiError(payload.error ?? 'KI ist auf dem Server nicht konfiguriert.', 'not_configured');
+    if (payload?.code === 'no_key') {
+      setPrefs({ aiKey: { configured: false, hint: null, fallback: false } });
+      throw new AiError(payload.error ?? 'Bitte hinterlege deinen Gemini-Schlüssel.', 'no_key');
+    }
     if (ctx?.status === 429) throw new AiError('Zu viele Anfragen – bitte kurz warten.', 'rate_limited');
     throw new AiError(payload?.error ?? error.message ?? 'KI-Anfrage fehlgeschlagen', 'failed');
   }
@@ -89,3 +101,24 @@ export interface BodyFatEstimate {
 export function estimateBodyFat(images: { data: string; mediaType: string; pose: string }[]) {
   return invoke<BodyFatEstimate>('body-fat', { images });
 }
+
+// ---------------------------------------------------------------- personal Gemini key
+export interface AiKeyStatus {
+  configured: boolean;
+  hint: string | null;
+  fallback: boolean;
+}
+
+async function keyCall(body: Record<string, unknown>): Promise<AiKeyStatus> {
+  const st = await invoke<AiKeyStatus>('ai-key', body);
+  setPrefs({ aiKey: { configured: st.configured, hint: st.hint, fallback: st.fallback } });
+  return st;
+}
+
+/** Refreshes the cached key status (called on start / after login). */
+export function refreshAiKeyStatus() {
+  if (!AI_ENABLED || !supabase || !useDB.getState().accountUserId) return Promise.resolve(null);
+  return keyCall({ action: 'status' }).catch(() => null);
+}
+export const saveAiKey = (key: string) => keyCall({ action: 'set', key });
+export const deleteAiKey = () => keyCall({ action: 'delete' });

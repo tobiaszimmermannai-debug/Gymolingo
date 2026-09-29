@@ -235,26 +235,47 @@ function jpegSize(buf: Buffer): { width: number; height: number } {
   throw new Error('no SOF marker');
 }
 
-test('AI body fat estimate from photos: consent, downscaled upload, result, save as estimate', async ({ page }) => {
-  await register(page, 'Kai', `kfa-${run}@example.com`);
+test('personal Gemini key + AI body fat from photos: auto-run after upload, consent, downscaled upload, save as estimate', async ({ page }) => {
+  // the edge functions are mocked here (they have their own tests: npm run test:edge)
+  let stored: string | null = null;
+  await page.route('**/functions/v1/ai-key', async (route) => {
+    const body = route.request().postDataJSON() as { action: string; key?: string };
+    if (body.action === 'set') {
+      if (!body.key?.startsWith('AIza')) return route.fulfill({ status: 400, json: { error: 'Google lehnt diesen Schlüssel ab.' } });
+      stored = body.key;
+    }
+    if (body.action === 'delete') stored = null;
+    await route.fulfill({ json: { configured: !!stored, hint: stored ? stored.slice(-4) : null, fallback: false } });
+  });
   let payload: { images: { data: string; mediaType: string; pose: string }[] } | null = null;
   await page.route('**/functions/v1/body-fat', async (route) => {
     payload = route.request().postDataJSON();
     await route.fulfill({ json: { usable: true, body_fat_pct: 17.2, range_low: 15, range_high: 19.5, confidence: 'medium', cues: 'Leichte Bauchdefinition sichtbar.', photo_tips: 'Gleiches Licht und Abstand.' } });
   });
+  await register(page, 'Kai', `kfa-${run}@example.com`);
   const big = await page.screenshot({ type: 'jpeg', quality: 80, scale: 'device' }); // ~1170 × 1992 px (device pixels)
   expect(jpegSize(big).height).toBeGreaterThan(1500);
 
+  // without a key the card links to the key setup
   await page.goto('/body/photos');
-  await expect(page.getByTestId('bf-ai')).toHaveCount(0); // no photo yet
+  await page.getByTestId('bf-setup-key').click();
+  await expect(page.getByTestId('ai-settings')).toBeVisible();
+  await page.getByTestId('ai-key-input').fill('falscher-schluessel-123456');
+  await page.getByTestId('ai-key-save').click();
+  await expect(page.getByTestId('ai-key-msg')).toContainText('lehnt');
+  await page.getByTestId('ai-key-input').fill('AIzaSyTestPersonalKey000000000wxyz');
+  await page.getByTestId('ai-key-save').click();
+  await expect(page.getByTestId('ai-key-status')).toContainText('…wxyz');
+  expect(stored).toBe('AIzaSyTestPersonalKey000000000wxyz');
+
+  // adding a photo starts the estimate right away – first time asks for consent (declined → nothing sent)
+  await page.goto('/body/photos');
+  const consentDeclined = page.waitForEvent('dialog').then((d) => d.dismiss());
   const chooser = page.waitForEvent('filechooser');
   await page.getByTestId('photo-gallery').click();
   await (await chooser).setFiles({ name: 'front.jpg', mimeType: 'image/jpeg', buffer: big });
   await expect(page.getByTestId('photo-image')).toHaveCount(1);
-
-  // consent is asked once; declining sends nothing
-  page.once('dialog', (d) => d.dismiss());
-  await page.getByTestId('bf-ai').click();
+  await consentDeclined;
   await expect(page.getByTestId('bf-ai-result')).toHaveCount(0);
   expect(payload).toBeNull();
 
@@ -272,8 +293,12 @@ test('AI body fat estimate from photos: consent, downscaled upload, result, save
   await page.goto('/body/weight');
   await expect(page.getByText('~17,2 %')).toBeVisible();
 
-  // consent can be revoked
+  // consent can be revoked; key can be removed
   await page.goto('/body/photos');
   await page.getByTestId('bf-revoke').click();
   await expect(page.getByTestId('bf-revoke')).toHaveCount(0);
+  await page.goto('/settings/ai');
+  page.once('dialog', (d) => d.accept());
+  await page.getByTestId('ai-key-delete').click();
+  await expect(page.getByTestId('ai-key-status')).toContainText('Noch kein Schlüssel');
 });

@@ -3,8 +3,8 @@
  *  - action "chat": answers a question using a factual snapshot of the user's data
  *  - action "weekly_report": interprets the deterministic weekly statistics
  * All numbers are computed by @gymolingo/core (bundled in _shared/core.mjs).
- * Without GEMINI_API_KEY (or when the daily AI limit is reached) the same data
- * is answered by the rule-based coach.
+ * Without a Gemini key (personal or shared) or when the daily AI limit is reached,
+ * the same data is answered by the rule-based coach.
  */
 import {
   answerOffline,
@@ -16,7 +16,8 @@ import {
   startOfWeek,
   WEEKLY_REPORT_PROMPT,
 } from '../_shared/core.mjs';
-import { describeError, generate, geminiKey, MODEL } from '../_shared/gemini.ts';
+import { describeError, generate, MODEL } from '../_shared/gemini.ts';
+import { resolveGeminiKey } from '../_shared/userKey.ts';
 import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
 import { loadUserData, userClient } from '../_shared/userData.ts';
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
   const custom = new Map((customRows ?? []).map((c: Record<string, unknown>) => [c.id as string, { ...c, increment_kg: Number(c.increment_kg) }]));
   const lookup = (id: string) => custom.get(id) as never;
 
-  const key = geminiKey();
+  const key = await resolveGeminiKey(sb, auth.user.id);
   const aiAllowed = async () => !!key && (await consumeAiQuota(sb).catch(() => false));
 
   if (body.action === 'chat') {

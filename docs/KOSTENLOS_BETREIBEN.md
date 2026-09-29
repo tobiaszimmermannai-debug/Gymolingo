@@ -23,8 +23,8 @@ Ziel: Entwicklung **und** Betrieb ohne laufende Kosten. Alles, was Geld kosten k
 4. *Authentication → URL Configuration*: **Site URL** = `https://<github-user>.github.io/Gymolingo/`
 5. Tipp: *Authentication → Sign In / Providers → Email*: „Confirm email“ ausschalten, solange nur du und Freunde die App nutzen – der Gratis-E-Mail-Versand von Supabase ist stark begrenzt.
 
-### 2. Gemini-Schlüssel (optional, für KI)
-Auf [aistudio.google.com](https://aistudio.google.com) → **Get API key** → Schlüssel erstellen. Siehe Abschnitt „KI & Kosten“ unten.
+### 2. KI: jede Person ihr eigener kostenloser Gemini-Schlüssel
+Nichts auf GitHub nötig. Jede Person (du und deine Freunde) erstellt nach dem ersten Login in der App unter *Einstellungen → KI (Google Gemini)* einen Schlüssel auf [aistudio.google.com/apikey](https://aistudio.google.com/apikey) und fügt ihn ein (2 Minuten, keine Kreditkarte).
 
 ### 3. GitHub-Repository einstellen
 *Settings → Secrets and variables → Actions*
@@ -33,12 +33,11 @@ Auf [aistudio.google.com](https://aistudio.google.com) → **Get API key** → S
 |---|---|---|
 | Secret | `SUPABASE_ACCESS_TOKEN` | Access Token aus Schritt 1.3 |
 | Secret | `SUPABASE_DB_PASSWORD` | DB-Passwort aus Schritt 1.1 |
-| Secret | `GEMINI_API_KEY` | optional, aus Schritt 2 |
 | Variable | `SUPABASE_PROJECT_REF` | Project Ref |
 | Variable | `SUPABASE_URL` | Project URL |
 | Variable | `SUPABASE_ANON_KEY` | Publishable/Anon Key (öffentlich, durch RLS geschützt) |
-| Variable | `AI_ENABLED` | `true`, wenn KI genutzt werden soll |
-| Variable | `AI_DAILY_LIMIT` | optional, KI-Anfragen pro Nutzer/Tag (Standard 30) |
+| Variable | `AI_ENABLED` | `true` (KI-Funktionen in der App anzeigen) |
+| Variable | `AI_DAILY_LIMIT` | optional, KI-Anfragen pro Nutzer/Tag (Standard 40) |
 
 ### 4. GitHub Pages einschalten
 *Settings → Pages → Source: **GitHub Actions***.
@@ -50,12 +49,14 @@ Die App liegt dann unter `https://<github-user>.github.io/Gymolingo/`. Künftige
 ## PWA installieren
 Seite im Handy-Browser öffnen → **„Zum Home-Bildschirm“** (iPhone: Teilen-Symbol; Android: Menü ⋮). Die App startet danach wie eine normale App, im Vollbild und nach dem ersten Besuch auch offline.
 
-## KI & Kosten (Google Gemini)
-- Die KI läuft **nur serverseitig** (Supabase Edge Functions). Der Schlüssel liegt als Secret auf Supabase, nie in der App.
-- Modell: `gemini-flash-latest` (änderbar per Secret `GEMINI_MODEL`).
-- Jeder Nutzer hat ein **Tageslimit** (`AI_DAILY_LIMIT`, Standard 30). Ist es erreicht oder das Gemini-Kontingent erschöpft, antwortet der kostenlose Regel-Coach.
-- **Wichtig (Nutzungsbedingungen von Google, Stand Recherche 09/2026):** Die kostenlose Stufe darfst du für dich selbst nutzen. Wenn du die App **anderen Nutzern im EWR, der Schweiz oder UK** bereitstellst, verlangen die Gemini-Bedingungen einen Cloud-Projekt-**Abrechnungskonto** („Paid Services“). Dann fallen pro Anfrage kleine Kosten an → in der Google Cloud ein **Budget mit Benachrichtigung** setzen und `AI_DAILY_LIMIT` niedrig halten. Bitte vor der Veröffentlichung die aktuellen Bedingungen auf ai.google.dev prüfen.
+## KI & Kosten (Google Gemini) – kostenlos per eigenem Schlüssel
+- **Jede Person nutzt ihren eigenen Gemini-Schlüssel** aus Google AI Studio (Gratis-Stufe, ohne Kreditkarte). Ohne hinterlegtes Zahlungsmittel kann Google nichts berechnen – ist das Tageskontingent aufgebraucht, antwortet der kostenlose Regel-Coach.
+- Warum eigene Schlüssel? Googles Bedingungen verlangen für Apps, die man **anderen** Nutzern im EWR/CH/UK bereitstellt, ein Abrechnungskonto. Mit eigenem Schlüssel nutzt jede Person Gemini für sich selbst; für Nutzer in der EU gelten laut Google dabei auch im Gratis-Kontingent die Datenschutzregeln der bezahlten Dienste (keine Nutzung zum Training).
+- Der Schlüssel wird in der App eingegeben, von Google geprüft und **verschlüsselt** (AES-GCM, `AI_KEY_SECRET` nur auf dem Server) gespeichert – die App bekommt ihn nie zurück.
+- Modelle (automatisch aktuell): **Flash-Lite** für Coach, Wochenbericht (großes Gratis-Kontingent), **Flash** für Foto-Analysen mit automatischem Rückfall auf Flash-Lite. Änderbar per Secret `GEMINI_MODEL` / `GEMINI_VISION_MODEL`.
+- Tageslimit pro Person: `AI_DAILY_LIMIT` (Standard 40). Bei 4 Personen und 100–120 Anfragen/Tag sind das ~30 pro Person – deutlich unter dem Gratis-Kontingent von Flash-Lite.
 - Fotos (Mahlzeit, KFA) werden verkleinert (max. 1024 px) übertragen; für Körperfotos fragt die App vorher um Einwilligung.
+- Optional: gemeinsamer Server-Schlüssel (`GEMINI_API_KEY`) – nur mit bezahltem Google-Konto sinnvoll, daher standardmäßig nicht gesetzt.
 
 ## Auf dem eigenen Handy ohne Store
 - **PWA** (siehe oben) – kostenlos, iPhone und Android.
@@ -66,12 +67,13 @@ Seite im Handy-Browser öffnen → **„Zum Home-Bildschirm“** (iPhone: Teilen
 
 | Baustein | Kosten | Status |
 |---|---|---|
-| Gemini API für andere Nutzer (EWR/CH/UK) | nutzungsbasiert, sehr gering bei Flash-Modellen | aus, bis `AI_ENABLED=true` + Schlüssel |
+| Gemeinsamer Gemini-Schlüssel mit Abrechnung | nutzungsbasiert | nicht nötig – eigene Gratis-Schlüssel pro Person |
 | Google Play Store | einmalig 25 US-$ | nur für Store-Veröffentlichung |
 | Apple App Store | 99 US-$ pro Jahr | nur für Store-Veröffentlichung |
 | Supabase Pro | monatlich | nicht nötig |
 
 ## Checkliste „0 €"
-- [ ] `AI_ENABLED` nicht gesetzt oder kein `GEMINI_API_KEY` → Regel-Coach
+- [ ] Gemini nur über eigene Gratis-Schlüssel (kein Zahlungsmittel in Google Cloud / AI Studio hinterlegt)
+- [ ] Kein `GEMINI_API_KEY`-Secret auf GitHub/Supabase
 - [ ] Supabase im Free-Plan, keine Kreditkarte hinterlegt
 - [ ] Hosting über GitHub Pages (öffentliches Repository)

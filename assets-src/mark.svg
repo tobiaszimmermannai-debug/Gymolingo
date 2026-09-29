@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Gymolingo mark: a "G" drawn as an almost-closed progress ring -->
-  <path d="M71.21 28.79 A30 30 0 1 0 80 50 H56" fill="none" stroke="#C6F432" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Gymolingo mark: a "G" drawn as an almost-closed progress ring (white on the blue icon) -->
+  <path d="M71.21 28.79 A30 30 0 1 0 80 50 H56" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

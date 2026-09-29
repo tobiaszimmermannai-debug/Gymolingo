@@ -1,4 +1,4 @@
-// Integration test of the AI edge functions (coach, meal-photo, body-fat) against the
+// Integration test of the AI edge functions (coach, meal-photo, body-fat, ai-key) against the
 // LOCAL Supabase stack and a mock Gemini API – no real key, no costs.
 // Usage: npm run db:start && npm run test:edge
 import { execSync, spawn } from 'node:child_process';
@@ -24,7 +24,12 @@ const mock = http.createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'application/json' });
     res.end(JSON.stringify(obj));
   };
-  if (mode === '429') return send(429, { error: { code: 429, message: 'Resource has been exhausted', status: 'RESOURCE_EXHAUSTED' } });
+  if (req.method === 'GET') {
+    // key validation (models.get)
+    if (String(req.headers['x-goog-api-key']).startsWith('AIzaBAD')) return send(400, { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT' } });
+    return send(200, { name: req.url.split('/v1beta/')[1] });
+  }
+  if (mode === '429' || (mode === 'flash429' && req.url.includes('/gemini-flash-latest:'))) return send(429, { error: { code: 429, message: 'Resource has been exhausted', status: 'RESOURCE_EXHAUSTED' } });
   if (mode === 'blocked') return send(200, { promptFeedback: { blockReason: 'SAFETY' }, modelVersion: 'gemini-mock' });
   const props = body.generationConfig?.responseJsonSchema?.properties ?? {};
   let text = 'Heute steht Oberkörper A an – starte mit Bankdrücken.';
@@ -54,7 +59,7 @@ for (const table of ['athlete_profiles', 'workout_plans', 'plan_days', 'plan_exe
 // ---------------------------------------------------------------- function runner
 async function withFunction(name, env, fn) {
   const proc = spawn('npx', ['-y', 'deno@latest', 'run', '-A', `supabase/functions/${name}/index.ts`], {
-    env: { ...process.env, SUPABASE_URL: API, SUPABASE_ANON_KEY: ANON, GEMINI_API_BASE: 'http://127.0.0.1:8788', ...env, ...(process.env.DENO_CERT ? {} : { DENO_CERT: '/root/.ccr/ca-bundle.crt' }) },
+    env: { ...process.env, SUPABASE_URL: API, SUPABASE_ANON_KEY: ANON, GEMINI_API_BASE: 'http://127.0.0.1:8788', AI_KEY_SECRET: 'test-secret-0123456789', ...env, ...(process.env.DENO_CERT ? {} : { DENO_CERT: '/root/.ccr/ca-bundle.crt' }) },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true, // own process group: npx → deno are killed together
   });
@@ -93,7 +98,7 @@ await withFunction('coach', KEY, async () => {
   let r = await call({ action: 'chat', message: 'Was trainiere ich heute?', history: [{ role: 'assistant', content: 'Hi' }, { role: 'user', content: 'Hey' }, { role: 'assistant', content: 'Wie kann ich helfen?' }] });
   ok(r.body.source === 'ai' && r.body.reply.includes('Oberkörper A'), 'coach chat: answered by Gemini');
   const req = calls.at(-1);
-  ok(req.url === '/v1beta/models/gemini-flash-latest:generateContent' && req.key === 'test-key', 'request: model path + x-goog-api-key header');
+  ok(req.url === '/v1beta/models/gemini-flash-lite-latest:generateContent' && req.key === 'test-key', 'request: Flash-Lite for text + x-goog-api-key header');
   ok(req.body.systemInstruction?.parts?.[0]?.text.length > 50, 'request: system instruction sent');
   ok(req.body.contents[0].role === 'user' && req.body.contents.at(-2).role === 'model', 'request: history mapped to user/model and starts with user');
   ok(req.body.contents.at(-1).parts[0].text.includes('<nutzerdaten>'), 'request: user data snapshot included');
@@ -126,12 +131,13 @@ await withFunction('meal-photo', { GEMINI_API_KEY: 'test-key', AI_DAILY_LIMIT: '
   const r = await call({ image: img.data, mediaType: 'image/jpeg', hint: 'Mittagessen' });
   ok(r.status === 200 && r.body.items[0].name === 'Hähnchenbrust', 'meal photo: items parsed');
   ok(calls.at(-1).body.contents[0].parts[0].inlineData?.mimeType === 'image/jpeg', 'meal photo: image sent as inlineData');
+  ok(calls.at(-1).url.includes('/gemini-flash-latest:'), 'meal photo: Flash (vision) model used');
   ok((await call({ image: img.data, mediaType: 'image/tiff' })).status === 415, 'meal photo: unsupported format rejected');
 });
 
 await withFunction('meal-photo', {}, async () => {
   const r = await call({ image: img.data, mediaType: 'image/jpeg' });
-  ok(r.status === 501 && r.body.code === 'not_configured', 'meal photo without key → 501 not_configured');
+  ok(r.status === 501 && r.body.code === 'no_key', 'meal photo without any key → 501 no_key');
 });
 
 await withFunction('body-fat', { GEMINI_API_KEY: 'test-key', AI_DAILY_LIMIT: '100' }, async () => {
@@ -146,6 +152,41 @@ await withFunction('body-fat', { GEMINI_API_KEY: 'test-key', AI_DAILY_LIMIT: '10
   r = await call({ images: [{ ...img, pose: 'front' }] });
   ok(r.status === 422, 'body fat: blocked → 422 with fallback hint');
   mode = 'ok';
+});
+
+// ---------------------------------------------------------------- personal keys (free tier per person)
+const PERSONAL = 'AIzaGOOD_personal_key_1234567890abcd';
+await withFunction('ai-key', {}, async () => {
+  let r = await call({ action: 'status' });
+  ok(r.body.configured === false && r.body.fallback === false, 'ai-key: no key stored initially');
+  ok((await call({ action: 'set', key: 'kurz' })).status === 400, 'ai-key: malformed key rejected');
+  r = await call({ action: 'set', key: 'AIzaBAD_invalid_key_000000000000000' });
+  ok(r.status === 400 && /lehnt/.test(r.body.error), 'ai-key: key rejected by Google is not stored');
+  r = await call({ action: 'set', key: PERSONAL });
+  ok(r.body.configured === true && r.body.hint === 'abcd', 'ai-key: valid key stored, only last 4 chars returned');
+  const rows = await (await fetch(`${API}/rest/v1/ai_keys?select=*`, { headers: { apikey: ANON, Authorization: `Bearer ${jwt}` } })).json();
+  ok(rows.length === 1 && !JSON.stringify(rows).includes('personal_key'), 'ai-key: only ciphertext in the database');
+});
+await withFunction('coach', { AI_DAILY_LIMIT: '100' }, async () => {
+  const r = await call({ action: 'chat', message: 'Was trainiere ich heute?' });
+  ok(r.body.source === 'ai' && calls.at(-1).key === PERSONAL, 'coach uses the personal key (no shared key configured)');
+});
+await withFunction('coach', { AI_DAILY_LIMIT: '100', AI_KEY_SECRET: 'rotated-secret-xyz' }, async () => {
+  const before = calls.length;
+  const r = await call({ action: 'chat', message: 'Was trainiere ich heute?' });
+  ok(r.body.source === 'rules' && calls.length === before, 'unreadable key (rotated secret) → rules, no crash');
+});
+await withFunction('body-fat', { AI_DAILY_LIMIT: '100' }, async () => {
+  mode = 'flash429';
+  const n = calls.length;
+  const r = await call({ images: [{ ...img, pose: 'front' }] });
+  ok(r.status === 200 && r.body.body_fat_pct === 18.4, 'body fat: Flash quota used up → Flash-Lite fallback');
+  ok(calls.slice(n).map((c) => c.url.split('/models/')[1].split(':')[0]).join(',') === 'gemini-flash-latest,gemini-flash-lite-latest', 'body fat: model order Flash → Flash-Lite');
+  mode = 'ok';
+});
+await withFunction('ai-key', {}, async () => {
+  const r = await call({ action: 'delete' });
+  ok(r.body.configured === false, 'ai-key: key deleted');
 });
 
 mock.close();

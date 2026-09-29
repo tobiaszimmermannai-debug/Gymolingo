@@ -32,6 +32,7 @@ import '@/lib/health/enable';
 import { supabase } from '@/lib/supabase';
 import { uploadPendingPhotos } from './photoSync';
 import { registerServiceWorker } from '@/lib/pwa';
+import { refreshAiKeyStatus } from '@/lib/ai';
 
 export function AppBootstrap() {
   const onboarded = useDB((s) => !!s.tables.athlete_profiles[s.userId]?.onboarding_completed);
@@ -53,6 +54,7 @@ function useAutoSync() {
       void syncNow().then(() => uploadPendingPhotos());
     };
     run();
+    void refreshAiKeyStatus();
     const interval = setInterval(run, 5 * 60 * 1000);
     const sub = AppState.addEventListener('change', (st) => st === 'active' && run());
     let wasOffline = false;
