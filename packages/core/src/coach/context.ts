@@ -9,6 +9,7 @@ import type { UserData } from '../data/aggregate';
 import { buildDailyActivities } from '../data/aggregate';
 import { weightSummary } from '../body/trend';
 import { dayNutrition, remainingForDay } from '../nutrition/calc';
+import { CARDIO_LABELS_DE, cardioSummary } from '../cardio/energy';
 import { EXERCISE_MAP } from '../training/exercises';
 import { suggestProgression } from '../training/progression';
 import { computePersonalRecords, exerciseHistory, mostTrainedExercises } from '../training/stats';
@@ -36,6 +37,8 @@ export interface CoachContext {
     kcal_remaining: number;
     protein_remaining: number;
     workout_done: boolean;
+    /** calories burned today by walk / jog / run / EMS */
+    cardio_kcal_today: number;
     steps: number | null;
   };
   last_28_days: {
@@ -55,6 +58,8 @@ export interface CoachContext {
     weekly_rate_30d: number | null;
     entries_30d: number;
   };
+  /** walk / jog / run / EMS in the last 28 days */
+  cardio_28_days: { sessions: number; minutes: number; km: number; kcal: number; by_activity: Record<string, number>; last: string | null };
   key_lifts: {
     exercise: string;
     last_date: ISODate | null;
@@ -138,6 +143,7 @@ export function buildCoachContext(
       kcal_remaining: rem.kcal,
       protein_remaining: rem.protein_g,
       workout_done: acts.some((a) => a.date === today && a.workouts > 0),
+      cardio_kcal_today: acts.find((a) => a.date === today)?.cardioKcal ?? 0,
       steps: acts.find((a) => a.date === today)?.steps || null,
     },
     last_28_days: {
@@ -157,6 +163,18 @@ export function buildCoachContext(
       weekly_rate_30d: ws.weeklyRate30,
       entries_30d: ws.daysLogged30,
     },
+    cardio_28_days: (() => {
+      const c = cardioSummary(data.cardio ?? [], from, today);
+      const last = [...(data.cardio ?? [])].filter((x) => !x.deleted).sort((a, b) => b.date.localeCompare(a.date))[0];
+      return {
+        sessions: c.sessions,
+        minutes: c.minutes,
+        km: c.km,
+        kcal: c.kcal,
+        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k as keyof typeof CARDIO_LABELS_DE], v])),
+        last: last ? `${last.date}: ${CARDIO_LABELS_DE[last.activity]} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ''}${last.activity === 'ems' ? ` (${last.intensity})` : ''}, ${last.kcal} kcal` : null,
+      };
+    })(),
     key_lifts,
     today_plan: todayPlan,
     data_gaps: gaps,

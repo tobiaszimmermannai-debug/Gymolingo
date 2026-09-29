@@ -36,6 +36,9 @@ export interface PeriodStats {
   stepGoalDays: number;
   avgWeight: number | null;
   checkins: number;
+  cardioSessions: number;
+  cardioKm: number;
+  cardioKcal: number;
 }
 
 function stats(data: UserData, from: ISODate, to: ISODate): PeriodStats {
@@ -58,6 +61,9 @@ function stats(data: UserData, from: ISODate, to: ISODate): PeriodStats {
     stepGoalDays: acts.filter((a) => a.stepsHit).length,
     avgWeight: avg(w.map((p) => p.weight)),
     checkins: acts.filter((a) => a.checkin).length,
+    cardioSessions: acts.reduce((a, x) => a + x.cardio, 0),
+    cardioKm: Math.round((data.cardio ?? []).filter((c) => !c.deleted && c.date >= from && c.date <= to).reduce((a, c) => a + (c.distance_km ?? 0), 0) * 10) / 10,
+    cardioKcal: acts.reduce((a, x) => a + x.cardioKcal, 0),
   };
 }
 

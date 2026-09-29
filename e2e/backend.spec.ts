@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { completeOnboarding } from './helpers';
+import { completeOnboarding, mockGemini } from './helpers';
 
 /**
  * Runs against the web build connected to the local Supabase stack
@@ -70,6 +70,7 @@ test('register from guest mode, sync and restore on a second device', async ({ p
 
 test('friends: request, accept, leaderboard and privacy settings are enforced', async ({ page, browser }) => {
   const a = page;
+  await mockGemini(a);
   await register(a, 'Ada', `ada-${run}@example.com`);
   await a.getByTestId('tab-community').click();
   await a.getByTestId('username-input').fill(`ada_${run}`);
@@ -77,11 +78,17 @@ test('friends: request, accept, leaderboard and privacy settings are enforced', 
   await expect(a.getByTestId('community-screen')).toBeVisible();
 
   const b = await newPage(browser);
+  const bobGoogle = await mockGemini(b);
   await register(b, 'Bob', `bob-${run}@example.com`);
   // Bob logs steps so there is something to compare
   await b.goto('/checkin');
   await b.getByTestId('steps-input').fill('12345');
   await b.getByTestId('submit-checkin').click();
+  // privacy by default: only streaks + "zuletzt online" are shared → Bob opts in to share steps
+  await b.goto('/settings/privacy');
+  await expect(b.getByTestId('privacy-steps').locator('input')).not.toBeChecked();
+  await expect(b.getByTestId('privacy-online').locator('input')).toBeChecked();
+  await b.getByTestId('privacy-steps').locator('input').click();
   await syncNow(b);
   await b.goto('/community');
   await b.getByTestId('username-input').fill(`bob_${run}`);
@@ -100,9 +107,25 @@ test('friends: request, accept, leaderboard and privacy settings are enforced', 
   await a.getByTestId('tab-index').click();
   await expect(a.getByTestId('briefing-friends')).toContainText('Bob');
   await expect(a.getByTestId('briefing-friends')).toContainText('gerade online');
-  await a.getByTestId('tab-community').click();
 
-  // leaderboard shows both, Bob's steps are visible (shared by default)
+  // one Gemini key for the group: Ada stores and shares it, Bob gets AI without entering anything
+  await a.goto('/settings/ai');
+  await a.getByTestId('ai-key-input').fill('AIzaSyGroupKey00000000000000000grp1');
+  await a.getByTestId('ai-key-save').click();
+  await expect(a.getByTestId('ai-key-status')).toContainText('…grp1');
+  await a.getByTestId('ai-share').click();
+  await expect(a.getByTestId('ai-share-status')).toContainText('Freigegeben');
+  await b.goto('/settings/ai');
+  await expect(b.getByTestId('ai-shared-active')).toContainText('Ada');
+  await b.goto('/coach');
+  await b.getByTestId('coach-input').fill('Was steht heute an?');
+  await b.getByTestId('coach-send').click();
+  await expect(b.getByTestId('coach-msg-assistant').last()).toContainText('KI-Antwort');
+  expect(bobGoogle.calls.at(-1)!.key).toBe('AIzaSyGroupKey00000000000000000grp1');
+
+  await a.goto('/community');
+
+  // leaderboard shows both, Bob's steps are visible (Bob opted in)
   await a.getByTestId('community-tab-leaderboard').click();
   await a.getByTestId('lb-steps').click();
   await expect(a.getByTestId('leaderboard')).toContainText('Bob');

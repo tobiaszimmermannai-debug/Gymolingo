@@ -18,6 +18,7 @@ import type {
   StreakPause,
   UserAchievement,
   WeightEntry,
+  CardioSession,
   WorkoutPlan,
   WorkoutSession,
   WorkoutSet,
@@ -42,6 +43,7 @@ export interface TableTypes {
   body_measurements: BodyMeasurement;
   progress_photos: ProgressPhoto;
   step_entries: StepEntry;
+  cardio_sessions: CardioSession;
   daily_checkins: DailyCheckin;
   streak_pauses: StreakPause;
   user_achievements: UserAchievement;
@@ -70,6 +72,7 @@ export const TABLES: TableName[] = [
   'body_measurements',
   'progress_photos',
   'step_entries',
+  'cardio_sessions',
   'daily_checkins',
   'streak_pauses',
   'user_achievements',

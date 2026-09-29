@@ -11,8 +11,10 @@ import { suggestedWeekdays } from '../streaks/streaks';
 import { computePersonalRecords, isWorkingSet } from '../training/stats';
 import type { DailyActivity } from '../gamification/xp';
 import { emptyActivity } from '../gamification/xp';
+import { COUNTS_AS_TRAINING } from '../cardio/energy';
 import type {
   AthleteProfile,
+  CardioSession,
   DailyCheckin,
   MealEntry,
   StepEntry,
@@ -31,6 +33,8 @@ export interface UserData {
   steps: StepEntry[];
   checkins: DailyCheckin[];
   pauses: StreakPause[];
+  /** walk / jog / run / EMS sessions (optional for older callers) */
+  cardio?: CardioSession[];
 }
 
 /**
@@ -55,8 +59,11 @@ export function stepsByDate(entries: StepEntry[]): Map<ISODate, StepEntry> {
   return out;
 }
 
-export function trainedDates(sessions: WorkoutSession[]): Set<ISODate> {
-  return new Set(sessions.filter((s) => !s.deleted && s.status === 'completed').map((s) => s.date));
+/** Days with a completed gym workout or a jog / run / EMS session. */
+export function trainedDates(sessions: WorkoutSession[], cardio: CardioSession[] = []): Set<ISODate> {
+  const out = new Set(sessions.filter((s) => !s.deleted && s.status === 'completed').map((s) => s.date));
+  for (const c of cardio) if (!c.deleted && COUNTS_AS_TRAINING[c.activity]) out.add(c.date);
+  return out;
 }
 
 export function buildDailyActivities(data: UserData, from: ISODate, to: ISODate): DailyActivity[] {
@@ -106,6 +113,12 @@ export function buildDailyActivities(data: UserData, from: ISODate, to: ISODate)
     a.steps = e.steps;
     a.stepsHit = profile.step_target > 0 && e.steps >= profile.step_target;
   }
+  for (const c of data.cardio ?? []) {
+    if (c.deleted || !inRange(c.date)) continue;
+    const a = get(c.date);
+    a.cardio += 1;
+    a.cardioKcal += c.kcal;
+  }
   for (const c of data.checkins) if (!c.deleted && inRange(c.date)) get(c.date).checkin = true;
   for (const w of data.weights) if (!w.deleted && inRange(w.date)) get(w.date).weighed = true;
 
@@ -120,6 +133,7 @@ export function firstDataDate(data: UserData): ISODate | null {
   data.weights.forEach((w) => !w.deleted && push(w.date));
   data.steps.forEach((s) => !s.deleted && push(s.date));
   data.checkins.forEach((c) => !c.deleted && push(c.date));
+  (data.cardio ?? []).forEach((c) => !c.deleted && push(c.date));
   if (!dates.length) return null;
   return dates.reduce((m, d) => (d < m ? d : m));
 }
@@ -137,7 +151,7 @@ export function buildStreakInput(data: UserData, today: ISODate, since: ISODate,
     },
     pauses: data.pauses.filter((x) => !x.deleted),
     jokersPerMonth,
-    trainedDates: trainedDates(data.sessions),
+    trainedDates: trainedDates(data.sessions, data.cardio),
     nutritionDates: new Set(acts.filter((a) => a.nutritionLogged).map((a) => a.date)),
     proteinDates: new Set(acts.filter((a) => a.proteinHit).map((a) => a.date)),
     stepsDates: new Set(acts.filter((a) => a.stepsHit).map((a) => a.date)),

@@ -24,7 +24,9 @@ import type {
   WorkoutPlan,
   WorkoutSession,
   WorkoutSet,
+  CardioSession,
 } from '../types';
+import { cardioKcal } from '../cardio/energy';
 
 export interface DemoData {
   athlete_profiles: AthleteProfile[];
@@ -38,6 +40,7 @@ export interface DemoData {
   step_entries: StepEntry[];
   daily_checkins: DailyCheckin[];
   body_measurements: BodyMeasurement[];
+  cardio_sessions: CardioSession[];
 }
 
 /** Mulberry32 PRNG. */
@@ -145,6 +148,7 @@ export function generateDemoData(opts: { userId: string; today: ISODate; weeks?:
   const steps: StepEntry[] = [];
   const checkins: DailyCheckin[] = [];
   const measurements: BodyMeasurement[] = [];
+  const cardio: CardioSession[] = [];
 
   let trueWeight = startWeight;
   for (const date of dateRange(start, opts.today)) {
@@ -209,6 +213,15 @@ export function generateDemoData(opts: { userId: string; today: ISODate; weeks?:
       steps.push({ ...base(date, 21), date, steps: Math.round(Math.max(2500, 9000 + noise(2500) + (wd >= 5 ? 1500 : 0))), source: 'manual' });
       if (rnd() < 0.75) checkins.push({ ...base(date, 21), date, mood: Math.max(1, Math.min(5, Math.round(3.8 + noise(0.8)))), energy: Math.max(1, Math.min(5, Math.round(3.5 + noise(0.9)))), sleep_hours: Math.round((7 + noise(0.8)) * 2) / 2, note: null, day_closed: true, completed_at: ts(date, 21) });
     }
+    // endurance & EMS: EMS on Wednesdays, a jog on Saturdays, a walk on some Sundays
+    if (!isToday && (wd === 2 || wd === 5 || (wd === 6 && rnd() < 0.5))) {
+      const activity = wd === 2 ? 'ems' : wd === 5 ? 'jog' : 'walk';
+      const duration_min = activity === 'ems' ? 20 : activity === 'jog' ? Math.round(30 + rnd() * 12) : Math.round(40 + rnd() * 30);
+      const distance_km = activity === 'ems' ? null : Math.round((duration_min / 60) * (activity === 'jog' ? 8.6 + noise(0.5) : 5 + noise(0.3)) * 10) / 10;
+      const intensity = activity === 'ems' ? (rnd() < 0.6 ? 'intense' : 'medium') : 'medium';
+      const row = { activity, duration_min, distance_km, intensity } as const;
+      cardio.push({ ...base(date, activity === 'ems' ? 18 : 9), date, ...row, kcal: cardioKcal(row, trueWeight), kcal_manual: false, note: null });
+    }
     if (wd === 6) {
       const lost = startWeight - trueWeight;
       measurements.push({ ...base(date, 9), date, waist_cm: Math.round((94 - lost * 0.9 + noise(0.4)) * 10) / 10, chest_cm: Math.round((106 - lost * 0.3 + noise(0.4)) * 10) / 10, hips_cm: Math.round((102 - lost * 0.4 + noise(0.4)) * 10) / 10, arm_cm: Math.round((37 + noise(0.2)) * 10) / 10, thigh_cm: Math.round((60 - lost * 0.2 + noise(0.3)) * 10) / 10, neck_cm: 40, note: null });
@@ -227,5 +240,6 @@ export function generateDemoData(opts: { userId: string; today: ISODate; weeks?:
     step_entries: steps,
     daily_checkins: checkins,
     body_measurements: measurements,
+    cardio_sessions: cardio,
   };
 }

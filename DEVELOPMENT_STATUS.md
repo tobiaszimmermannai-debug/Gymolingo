@@ -47,6 +47,10 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Verlauf, Detailansicht, Bearbeiten abgeschlossener Sätze, PRs (Gewicht, e1RM, Wdh.)
 - ✅ Statistiken: e1RM-Verlauf, Volumen, Sätze/Muskelgruppe
 
+### 3b. Ausdauer & EMS
+- ✅ Spazieren, Joggen, Laufen, EMS-Training (Training-Tab → „Ausdauer & EMS“): Dauer, Distanz (optional), Stufe Leicht/Mittel/Intensiv; kcal nach MET (Compendium 2011, Tempo aus Distanz) bzw. EMS-Studienwerten (MET 3,5/4,5/5,5); Pace & km/h; eigener Wert (Uhr) überschreibbar
+- ✅ Zählt für Trainings-Serie/Wochenquote (Joggen/Laufen/EMS, nicht Spazieren), XP, Tagesbriefing, Progress, Wochenbericht, Coach-Kontext; optional „Verbrauch zum Kalorienziel addieren“ (als Kohlenhydrate)
+
 ### 4. Nutrition
 - ✅ Suche (deutsche Basis-DB, eigene, Rezepte, Open Food Facts), Portionen, Mahlzeiten
 - ✅ Kalorien/Makros/Ballaststoffe, verbleibend, Tages- & Wochenverlauf
@@ -77,7 +81,7 @@ Letzte Aktualisierung: 2026-09-28
 
 ### 8. Community
 - ✅ DB: Freundschaften, Challenges, Ranglisten, Freundesprofil mit Privatsphäre-Filter (pgTAP getestet)
-- ✅ Privatsphäre-Einstellungen (Gewicht/KFA/Ernährung/Fotos standardmäßig privat)
+- ✅ Privatsphäre-Einstellungen: **standardmäßig nur Streaks und „zuletzt online“ geteilt** (Nutzerwunsch), alles andere opt-in; unveränderte alte Einstellungen werden einmalig umgestellt
 - ✅ Community-Screens (Benutzername, Suche, Anfragen, Freundesliste, Freundesprofil, Ranglisten, private Challenges) – E2E mit Backend inkl. Privatsphäre-Durchsetzung
 
 ### 9. KI-Coach
@@ -98,11 +102,11 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
-- ✅ core: 116 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker)
-- ✅ DB: 54 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status); `setup.sql` auf frischer DB verifiziert
+- ✅ core: 126 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, Ausdauer/EMS)
+- ✅ DB: 61 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel); `setup.sql` (9 Migrationen) auf frischer DB verifiziert
 - ✅ Edge Functions: 38 Checks (`npm run test:edge`)
-- ✅ E2E lokal (13, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
-- ✅ E2E Backend (5): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges + „zuletzt online“ im Briefing, Kontolöschung, Offline-Sync, Fortschrittsbilder
+- ✅ E2E lokal (14, inkl. Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
+- ✅ E2E Backend (5): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Gruppen-Schlüssel, Kontolöschung, Offline-Sync, Fortschrittsbilder
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
 ## Fehlende API-Schlüssel / Konfiguration
@@ -126,6 +130,7 @@ Letzte Aktualisierung: 2026-09-28
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
 - Testphase (Nutzerwunsch): bis zu 3 Tester mit **demselben Gratis-Schlüssel**, eingetragen in der App (kein GitHub/Server nötig); 25 Anfragen/Person/Tag; Sperre sofort bei Google-429 (Tageskontingent bis Reset, Minutenlimit für RetryInfo-Dauer). Server-Modus: 25/Person, 75 gesamt (`ai_usage_global`), `ai_model_blocks`.
 - Einrichtung vereinfacht (Nutzer kam mit Secrets/Tokens nicht zurecht): `supabase/setup.sql` (aus Migrationen generiert, CI prüft Aktualität) im SQL Editor ausführen; öffentliche URL/Key in `config/backend.env`; Pages 1 Klick.
+- **Ein Gemini-Schlüssel für die Gruppe**: Besitzer gibt seinen Geräte-Schlüssel frei (`shared_ai_key`, `set_shared_ai_key`/`get_shared_ai_key`), alle akzeptierten Freunde erhalten ihn automatisch (Limit 25/Person/Tag bleibt).
 - „Zuletzt online“: `profiles.last_seen_at`, `touch_last_seen()`, `friends_activity()` (nur Freunde, abschaltbar via `share_online_status`), Anzeige im **Tagesbriefing** auf Home.
 - Edge Functions prüfen den Nutzer selbst (`verify_jwt = false`, `auth.getUser`) – kompatibel mit neuen Supabase-Signaturschlüsseln; `apikey` wird aus der Anfrage übernommen.
 - App-Icon blau (Verlauf #3B82F6→#1D4ED8, weißes G); App-Oberfläche bleibt Anthrazit/Lime.
@@ -137,9 +142,9 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Schlüssel in der App, Tagesbriefing, setup.sql": core 116/116, DB 54/54, Edge 38/38, E2E lokal 13/13, E2E Backend 5/5, Typecheck grün.
+- Stand „Ausdauer & EMS, Gruppen-Schlüssel, Privatsphäre-Voreinstellung": core 126/126, DB 61/61, Edge 38/38, E2E lokal 14/14, E2E Backend 5/5, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
-1. Nutzer: Pages einschalten, Gemini-Schlüssel in der App, Supabase-Projekt + `setup.sql` → URL/Publishable Key in `config/backend.env` eintragen (oder vom Nutzer übernehmen) → Live-Test (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
+1. **Blockiert:** Supabase-Werte fehlen im Build (`config/backend.env` leer, keine GitHub-Variablen). Nutzer schickt Project URL + Publishable Key → eintragen, pushen → Pages baut mit Backend. Achtung: Supabase-Projekte vor dem 29.09. brauchen die neuen Migrationen (setup.sql enthält alles; bei bestehendem Projekt nur Migrationen 20260929000005–07 nachziehen). (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.

@@ -24,3 +24,4 @@ export * from './nutrition/tips';
 export * from './dev/demo';
 export * from './ai/gemini';
 export * from './ai/tasks';
+export * from './cardio/energy';

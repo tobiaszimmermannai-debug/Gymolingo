@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
+import { router } from 'expo-router';
 import { Screen, Row } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
 import { Card } from '@/ui/Card';
@@ -8,7 +9,7 @@ import { Input } from '@/ui/Input';
 import { ProgressBar } from '@/ui/ProgressBar';
 import { spacing } from '@/ui/theme';
 import { useDB } from '@/data/store';
-import { AiError, aiUsageToday, LOCAL_DAILY_LIMIT, removeDeviceKey, saveDeviceKey } from '@/lib/ai';
+import { AiError, aiUsageToday, LOCAL_DAILY_LIMIT, refreshSharedKey, removeDeviceKey, saveDeviceKey, shareKeyWithFriends, stopSharingKey } from '@/lib/ai';
 import { confirm } from '@/lib/dialog';
 
 const AI_STUDIO = 'https://aistudio.google.com/apikey';
@@ -17,6 +18,12 @@ const AI_STUDIO = 'https://aistudio.google.com/apikey';
 export default function AiSettings() {
   const key = useDB((s) => s.prefs.geminiKey);
   const fallback = useDB((s) => !!s.accountUserId && !!s.prefs.aiKey?.fallback);
+  const account = useDB((s) => s.accountUserId);
+  const shared = useDB((s) => (s.accountUserId ? s.prefs.sharedAi : null));
+  const [shareBusy, setShareBusy] = useState(false);
+  useEffect(() => {
+    void refreshSharedKey();
+  }, [account]);
   useDB((s) => s.prefs.aiUsage?.count);
   const blocks = useDB((s) => s.prefs.aiBlocks);
   const [input, setInput] = useState('');
@@ -75,12 +82,82 @@ export default function AiSettings() {
               }}
             />
           </>
+        ) : shared && !shared.isOwner ? (
+          <>
+            <Text variant="bodyMedium" testID="ai-shared-active">
+              ✅ KI aktiv über den Schlüssel von {shared.ownerName} – du musst nichts tun.
+            </Text>
+            <Text variant="small" tone="secondary" style={{ marginTop: spacing.sm }} testID="ai-usage">
+              Heute {used} von {LOCAL_DAILY_LIMIT} KI-Anfragen genutzt
+            </Text>
+          </>
         ) : fallback ? (
           <Text>Die KI läuft über den gemeinsamen Server-Schlüssel. Ein eigener Schlüssel ist optional.</Text>
         ) : (
           <Text>Noch kein Schlüssel hinterlegt – Coach und Wochenbericht laufen ohne KI.</Text>
         )}
       </Card>
+
+      {key && (
+        <Card testID="ai-share-card">
+          <Text variant="h3">Für alle Freunde freigeben</Text>
+          {!account ? (
+            <>
+              <Text tone="secondary" style={{ marginTop: 6 }}>
+                Mit einem Konto kannst du diesen Schlüssel einmal freigeben – alle deine Freunde (Community) nutzen die KI dann automatisch, ohne selbst etwas einzutragen.
+              </Text>
+              <Button title="Konto erstellen / anmelden" variant="secondary" size="sm" style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} onPress={() => router.push('/auth')} />
+            </>
+          ) : shared?.isOwner ? (
+            <>
+              <Text tone="secondary" style={{ marginTop: 6 }} testID="ai-share-status">
+                ✅ Freigegeben (…{shared.hint}): Alle deine Freunde nutzen die KI automatisch. Jede Person hat trotzdem höchstens {LOCAL_DAILY_LIMIT} Anfragen am Tag.
+              </Text>
+              <Button
+                title="Freigabe beenden"
+                variant="secondary"
+                size="sm"
+                loading={shareBusy}
+                style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}
+                testID="ai-share-stop"
+                onPress={async () => {
+                  setShareBusy(true);
+                  await stopSharingKey().catch(() => undefined);
+                  setShareBusy(false);
+                }}
+              />
+            </>
+          ) : shared ? (
+            <Text tone="secondary" style={{ marginTop: 6 }}>
+              {shared.ownerName} hat bereits einen Schlüssel für die Gruppe freigegeben.
+            </Text>
+          ) : (
+            <>
+              <Text tone="secondary" style={{ marginTop: 6 }}>
+                Einmal tippen – alle, die in der Community mit dir befreundet sind, nutzen die KI automatisch (je höchstens {LOCAL_DAILY_LIMIT} Anfragen pro Tag).
+              </Text>
+              <Button
+                title="Für alle meine Freunde freigeben"
+                icon="people-outline"
+                loading={shareBusy}
+                style={{ marginTop: spacing.md }}
+                testID="ai-share"
+                onPress={async () => {
+                  setShareBusy(true);
+                  setMsg(null);
+                  try {
+                    await shareKeyWithFriends();
+                  } catch (e) {
+                    setMsg({ tone: 'danger', text: e instanceof Error ? e.message : 'Freigabe fehlgeschlagen.' });
+                  } finally {
+                    setShareBusy(false);
+                  }
+                }}
+              />
+            </>
+          )}
+        </Card>
+      )}
 
       <Card>
         <Text variant="h3">So geht's (2 Minuten)</Text>

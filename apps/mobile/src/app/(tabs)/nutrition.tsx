@@ -11,6 +11,8 @@ import {
   MEAL_LABELS_DE,
   MEAL_ORDER,
   remainingForDay,
+  burnedOn,
+  withExerciseCalories,
   todayISO,
   weekdayIndex,
   WEEKDAY_SHORT_DE,
@@ -33,8 +35,11 @@ import { nutritionTips } from '@/features/nutritionTips';
 
 export default function Nutrition() {
   const [date, setDate] = useState(todayISO());
-  const p = useProfileOrDefault();
+  const profile = useProfileOrDefault();
   const meals = useRows('meal_entries');
+  const cardio = useRows('cardio_sessions');
+  const burned = useMemo(() => burnedOn(date, cardio), [date, cardio]);
+  const p = useMemo(() => withExerciseCalories(profile, burned), [profile, burned]);
   const day = useMemo(() => dayNutrition(date, meals), [date, meals]);
   const rem = remainingForDay(day.totals, p);
   const isToday = date === todayISO();
@@ -77,6 +82,7 @@ export default function Nutrition() {
           <View style={{ flex: 1, gap: spacing.sm }}>
             <KV label="Gegessen" value={`${formatNumberDE(day.totals.kcal, 0)} kcal`} />
             <KV label="Ziel" value={`${formatNumberDE(p.calorie_target, 0)} kcal`} />
+            {burned > 0 && <KV label={profile.add_exercise_calories ? 'davon Aktivität' : 'Verbrannt (Aktivität)'} value={`${profile.add_exercise_calories ? '+' : ''}${formatNumberDE(burned, 0)} kcal`} />}
             <KV label="Ballaststoffe" value={`${formatNumberDE(day.totals.fiber_g, 0)} / ${p.fiber_target_g} g`} />
           </View>
         </Row>

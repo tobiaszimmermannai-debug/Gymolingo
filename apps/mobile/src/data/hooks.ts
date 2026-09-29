@@ -56,12 +56,12 @@ export const DEFAULT_PROFILE: Omit<AthleteProfile, keyof BaseRow> = {
 
 export const DEFAULT_PRIVACY: Omit<PrivacySettings, keyof BaseRow> = {
   searchable: true,
-  share_workouts: true,
-  share_steps: true,
+  share_workouts: false,
+  share_steps: false,
   share_streaks: true,
-  share_goal_completion: true,
-  share_prs: true,
-  share_level: true,
+  share_goal_completion: false,
+  share_prs: false,
+  share_level: false,
   share_weight: false,
   share_body_fat: false,
   share_nutrition: false,
@@ -109,9 +109,10 @@ export function useUserData(): UserData {
   const steps = useRows('step_entries');
   const checkins = useRows('daily_checkins');
   const pauses = useRows('streak_pauses');
+  const cardio = useRows('cardio_sessions');
   return useMemo(
-    () => ({ profile, sessions, sets, meals, weights, steps, checkins, pauses }),
-    [profile, sessions, sets, meals, weights, steps, checkins, pauses],
+    () => ({ profile, sessions, sets, meals, weights, steps, checkins, pauses, cardio }),
+    [profile, sessions, sets, meals, weights, steps, checkins, pauses, cardio],
   );
 }
 

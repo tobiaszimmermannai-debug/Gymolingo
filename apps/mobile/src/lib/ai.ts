@@ -34,14 +34,14 @@ export type AiAvailability = 'ok' | 'disabled' | 'no_key';
 export function aiAvailability(): AiAvailability {
   if (!AI_ENABLED) return 'disabled';
   const s = useDB.getState();
-  if (s.prefs.geminiKey) return 'ok';
+  if (s.prefs.geminiKey || s.prefs.sharedAi?.key) return 'ok';
   if (supabase && s.accountUserId && s.prefs.aiKey?.fallback) return 'ok';
   return 'no_key';
 }
 
 /** Reactive variant for screens. */
 export function useAiAvailability(): AiAvailability {
-  useDB((s) => [!!s.prefs.geminiKey, s.accountUserId, s.prefs.aiKey?.fallback].join('|'));
+  useDB((s) => [!!s.prefs.geminiKey, !!s.prefs.sharedAi?.key, s.accountUserId, s.prefs.aiKey?.fallback].join('|'));
   return aiAvailability();
 }
 
@@ -77,8 +77,14 @@ function consumeLocal(): boolean {
   return true;
 }
 
+/** The key used on this device: own key first, otherwise the one shared by the group owner. */
+export function activeGeminiKey(): string | null {
+  const p = useDB.getState().prefs;
+  return p.geminiKey || p.sharedAi?.key || null;
+}
+
 function deviceRun() {
-  const key = useDB.getState().prefs.geminiKey;
+  const key = activeGeminiKey();
   if (!key) return null;
   if (!consumeLocal()) throw new AiError(`Tageslimit erreicht (${LOCAL_DAILY_LIMIT} KI-Anfragen) – morgen geht es weiter.`, 'rate_limited');
   return { key, store: deviceStore };
@@ -107,6 +113,31 @@ export async function saveDeviceKey(raw: string): Promise<void> {
 
 export function removeDeviceKey() {
   setPrefs({ geminiKey: undefined });
+}
+
+// ---------------------------------------------------------------- key shared with friends (Supabase)
+/** Loads the group key (owner + accepted friends). */
+export async function refreshSharedKey() {
+  if (!AI_ENABLED || !supabase || !useDB.getState().accountUserId) return;
+  const { data, error } = await supabase.rpc('get_shared_ai_key');
+  if (error) return;
+  const row = Array.isArray(data) ? data[0] : null;
+  setPrefs({ sharedAi: row ? { key: row.gemini_key, hint: row.hint, ownerName: row.owner_name, isOwner: row.is_owner } : null });
+}
+
+/** Shares this device's key with all of the user's friends. */
+export async function shareKeyWithFriends() {
+  const key = useDB.getState().prefs.geminiKey;
+  if (!supabase || !key) throw new AiError('Zuerst einen Schlüssel auf diesem Gerät speichern.', 'failed');
+  const { error } = await supabase.rpc('set_shared_ai_key', { p_key: key });
+  if (error) throw new AiError(error.message, 'failed');
+  await refreshSharedKey();
+}
+
+export async function stopSharingKey() {
+  if (!supabase) return;
+  await supabase.rpc('clear_shared_ai_key');
+  await refreshSharedKey();
 }
 
 // ---------------------------------------------------------------- server mode (optional shared key)

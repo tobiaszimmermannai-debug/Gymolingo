@@ -64,7 +64,10 @@ test('settings: targets recalculation, reminders preview, privacy toggles, expor
   await page.goto('/settings/privacy');
   const weightToggle = page.getByTestId('privacy-weight').locator('input');
   await expect(weightToggle).not.toBeChecked();
-  await expect(page.getByTestId('privacy-workouts').locator('input')).toBeChecked();
+  // defaults: only streaks and "zuletzt online" are shared
+  await expect(page.getByTestId('privacy-workouts').locator('input')).not.toBeChecked();
+  await expect(page.getByTestId('privacy-steps').locator('input')).not.toBeChecked();
+  await expect(page.getByTestId('privacy-online').locator('input')).toBeChecked();
   await weightToggle.click();
   await expect(weightToggle).toBeChecked();
   await page.goto('/settings/account');

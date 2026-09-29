@@ -20,7 +20,8 @@ import {
   type PlannedReminder,
   type ReminderDayState,
 } from '@gymolingo/core';
-import { useDB, insert, setPrefs } from '@/data/store';
+import { useDB, insert, setPrefs, update } from '@/data/store';
+import { DEFAULT_PRIVACY } from '@/data/hooks';
 import { autoReportWeek, ensureWeeklyReport } from './coach';
 import { useReminderSettings, useRows } from '@/data/hooks';
 import { syncNow } from '@/data/sync';
@@ -32,7 +33,7 @@ import '@/lib/health/enable';
 import { supabase } from '@/lib/supabase';
 import { uploadPendingPhotos } from './photoSync';
 import { registerServiceWorker } from '@/lib/pwa';
-import { refreshAiKeyStatus } from '@/lib/ai';
+import { refreshAiKeyStatus, refreshSharedKey } from '@/lib/ai';
 import { refreshFriendsActivity, touchLastSeen } from './presence';
 
 export function AppBootstrap() {
@@ -55,6 +56,7 @@ function useAutoSync() {
       void syncNow().then(() => uploadPendingPhotos());
       void touchLastSeen();
       void refreshFriendsActivity();
+      void refreshSharedKey();
     };
     run();
     void refreshAiKeyStatus();
@@ -83,6 +85,15 @@ function OnboardedEffects() {
   const friends = useDB((s) => s.prefs.friendsCount ?? 0);
   const badges = useBadgeStats(t.data, t.streaks, t.game.level.level, t.game.challengesCompleted, friends);
   const account = useDB((s) => s.accountUserId);
+
+  // one-time: privacy rows that were never edited get the new defaults (only streaks + online status shared)
+  useEffect(() => {
+    const s = useDB.getState();
+    if (s.prefs.privacyDefaultsV2) return;
+    const row = s.tables.privacy_settings[s.userId];
+    if (row && !row.deleted && row.created_at === row.updated_at) update('privacy_settings', row.id, { ...DEFAULT_PRIVACY });
+    setPrefs({ privacyDefaultsV2: true });
+  }, []);
 
   // health import once per launch / foreground
   useEffect(() => {

@@ -91,6 +91,7 @@ function liveData() {
     weights: live(s.tables.weight_entries),
     steps: live(s.tables.step_entries),
     checkins: live(s.tables.daily_checkins),
+    cardio: live(s.tables.cardio_sessions),
     pauses: live(s.tables.streak_pauses),
   };
 }

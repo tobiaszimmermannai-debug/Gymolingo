@@ -68,6 +68,13 @@ export default function Progress() {
         <Kpi label="Trainings" value={String(cur.workouts)} delta={cur.workouts - prev.workouts} deltaText={formatSigned(cur.workouts - prev.workouts, 0)} testID="kpi-workouts" />
         <Kpi label="Volumen" value={`${formatNumberDE(cur.volumeKg / 1000, 1)} t`} delta={pctChange(cur.volumeKg, prev.volumeKg)} deltaText={pct(pctChange(cur.volumeKg, prev.volumeKg))} />
         <Kpi label="Kraft (e1RM)" value={pr.strength.pct === null ? '–' : formatSigned(pr.strength.pct, 1, '%')} delta={pr.strength.pct} deltaText={pr.strength.pct === null ? 'zu wenig Vergleichsdaten' : `${pr.strength.exercises.length} Übungen`} />
+        <Kpi
+          label="Ausdauer & EMS"
+          value={cur.cardioSessions ? `${cur.cardioSessions}×` : '–'}
+          delta={cur.cardioKcal - prev.cardioKcal || null}
+          deltaText={cur.cardioSessions ? `${cur.cardioKm ? `${formatNumberDE(cur.cardioKm, 1)} km · ` : ''}${formatNumberDE(cur.cardioKcal, 0)} kcal` : 'noch nichts eingetragen'}
+          testID="kpi-cardio"
+        />
         <Kpi label="Ø Kalorien" value={cur.avgKcal === null ? '–' : formatNumberDE(cur.avgKcal, 0)} delta={null} deltaText={`Ziel ${formatNumberDE(p.calorie_target, 0)}`} />
         <Kpi label="Ø Protein" value={cur.avgProtein === null ? '–' : `${formatNumberDE(cur.avgProtein, 0)} g`} delta={pctChange(cur.avgProtein, prev.avgProtein)} deltaText={`Ziel ${p.protein_target_g} g · ${pct(pctChange(cur.avgProtein, prev.avgProtein))}`} />
         <Kpi label="Ø Schritte" value={cur.avgSteps === null ? '–' : formatNumberDE(cur.avgSteps, 0)} delta={pctChange(cur.avgSteps, prev.avgSteps)} deltaText={pct(pctChange(cur.avgSteps, prev.avgSteps))} />

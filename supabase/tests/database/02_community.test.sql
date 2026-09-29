@@ -10,10 +10,10 @@ update public.profiles set username = 'anna' where id = '11111111-1111-1111-1111
 update public.profiles set username = 'ben' where id = '22222222-2222-2222-2222-222222222222';
 update public.profiles set username = 'cara' where id = '33333333-3333-3333-3333-333333333333';
 
--- Ben's data: steps, a workout, weight; Ben does NOT share steps
+-- Ben's data: steps, a workout, weight; Ben shares workouts but NOT steps (defaults: only streaks)
 insert into public.athlete_profiles (id, user_id, step_target, protein_target_g, training_days_per_week)
 values ('22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 10000, 150, 3);
-insert into public.privacy_settings (id, user_id, share_steps) values ('22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', false);
+insert into public.privacy_settings (id, user_id, share_steps, share_workouts) values ('22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', false, true);
 insert into public.step_entries (id, user_id, date, steps) values (gen_random_uuid(), '22222222-2222-2222-2222-222222222222', current_date, 12000);
 insert into public.workout_sessions (id, user_id, name, date, started_at, status)
 values ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Push', current_date, now(), 'completed');

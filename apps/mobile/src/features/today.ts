@@ -5,6 +5,8 @@
 import { useDeferredValue, useMemo } from 'react';
 import {
   buildDailyActivities,
+  burnedOn,
+  withExerciseCalories,
   buildStreakInput,
   computeAllStreaks,
   dayNutrition,
@@ -105,7 +107,10 @@ export function useTodayState() {
   const game = useGamification(data, today);
 
   return useMemo(() => {
-    const p = data.profile;
+    const cardioToday = (data.cardio ?? []).filter((c) => !c.deleted && c.date === today);
+    const burned = burnedOn(today, data.cardio ?? []);
+    // optional: calories burned by walk/jog/run/EMS raise today's target
+    const p = withExerciseCalories(data.profile, burned);
     const nut = dayNutrition(today, data.meals);
     const rem = remainingForDay(nut.totals, p);
     const schedule = {
@@ -164,6 +169,8 @@ export function useTodayState() {
       today,
       data,
       profile: p,
+      burnedKcal: burned,
+      cardioToday,
       nutrition: nut,
       remaining: rem,
       steps,

@@ -5,6 +5,7 @@
  * model (server-side) only *interprets* these statistics – it never invents
  * numbers. Without AI the rule-based texts below are shown.
  */
+import { CARDIO_LABELS_DE, cardioSummary, COUNTS_AS_TRAINING } from '../cardio/energy';
 import type { ISODate } from '../dates';
 import { addDays, dateRange, endOfWeek, startOfWeek } from '../dates';
 import { formatNumberDE, formatSigned } from '../format';
@@ -46,6 +47,8 @@ export interface WeeklyReportStats {
     volumeKg: number;
     volumePrevKg: number;
     setsPerMuscle: Record<string, number>;
+    /** walk / jog / run / EMS this week (jog/run/EMS also count as trainings above) */
+    cardio?: { sessions: number; minutes: number; km: number; kcal: number; byActivity: Record<string, number> };
   };
   nutrition: {
     daysLogged: number;
@@ -110,6 +113,9 @@ export function buildWeeklyReport(
 
   // ---------- consistency
   const done = data.sessions.filter((s) => !s.deleted && s.status === 'completed' && s.date >= ws && s.date <= we);
+  const cardioWeek = (data.cardio ?? []).filter((c) => !c.deleted && c.date >= ws && c.date <= we);
+  const cardioTrainings = cardioWeek.filter((c) => COUNTS_AS_TRAINING[c.activity]).length;
+  const cs = cardioSummary(cardioWeek, ws, we);
   const schedule = {
     type: p.schedule_type,
     weekdays: p.training_weekdays,
@@ -154,13 +160,16 @@ export function buildWeeklyReport(
       plateaus,
     },
     consistency: {
-      workoutsDone: done.length,
+      workoutsDone: done.length + cardioTrainings,
       workoutsPlanned: planned,
-      adherencePct: planned > 0 ? Math.round((Math.min(done.length, planned) / planned) * 100) : null,
+      adherencePct: planned > 0 ? Math.round((Math.min(done.length + cardioTrainings, planned) / planned) * 100) : null,
       workingSets: cur.reduce((a, x) => a + x.workingSets, 0),
       volumeKg: volume(ws, we),
       volumePrevKg: volume(prevWs, prevWe),
       setsPerMuscle: spmLabeled,
+      cardio: cs.sessions
+        ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k as keyof typeof CARDIO_LABELS_DE], v])) }
+        : undefined,
     },
     nutrition: {
       daysLogged: logged.length,
@@ -386,7 +395,13 @@ export function renderWeeklyReportText(s: WeeklyReportStats): { title: string; s
   const c = s.consistency;
   sections.push({
     heading: '2. Trainingskonsistenz',
-    body: `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ''}. ${c.workingSets} Arbeitssätze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).`,
+    body:
+      `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ''}. ${c.workingSets} Arbeitssätze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).` +
+      (c.cardio
+        ? ` Ausdauer & EMS: ${Object.entries(c.cardio.byActivity)
+            .map(([k, v]) => `${k} ${v}×`)
+            .join(', ')}, ${c.cardio.minutes} min${c.cardio.km ? `, ${formatNumberDE(c.cardio.km)} km` : ''}, ca. ${formatNumberDE(c.cardio.kcal, 0)} kcal.`
+        : ''),
   });
   const n = s.nutrition;
   sections.push({

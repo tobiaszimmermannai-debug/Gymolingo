@@ -1,35 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
-import { completeOnboarding, jpegSize } from './helpers';
+import { expect, test } from '@playwright/test';
+import { completeOnboarding, jpegSize, mockGemini } from './helpers';
 
 /**
  * AI with a Gemini key stored on the device – Google is simulated with page.route,
  * so no real key and no requests to Google are needed.
  */
-type Mode = 'ok' | 'daily429';
-async function mockGemini(page: Page) {
-  const state = { mode: 'ok' as Mode, calls: [] as { url: string; key: string | undefined; body: any }[] };
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
-  await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
-    const req = route.request();
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const key = req.headers()['x-goog-api-key'];
-    if (req.method() === 'GET') {
-      if (key?.startsWith('AIzaBAD')) return route.fulfill({ status: 400, headers: cors, json: { error: { code: 400, message: 'API key not valid.' } } });
-      return route.fulfill({ status: 200, headers: cors, json: { name: 'models/gemini-flash-lite-latest' } });
-    }
-    const body = req.postDataJSON();
-    state.calls.push({ url: req.url(), key, body });
-    if (state.mode === 'daily429')
-      return route.fulfill({ status: 429, headers: cors, json: { error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }] } } });
-    const props = body.generationConfig?.responseJsonSchema?.properties ?? {};
-    let text = 'KI-Antwort: Heute steht Oberkörper A an.';
-    if (props.body_fat_pct) text = JSON.stringify({ usable: true, body_fat_pct: 17.2, range_low: 15, range_high: 19.5, confidence: 'medium', cues: 'Leichte Bauchdefinition sichtbar.', photo_tips: 'Gleiches Licht und Abstand.' });
-    if (props.sections) text = JSON.stringify({ sections: Array.from({ length: 7 }, (_, i) => ({ heading: `${i + 1}. KI-Abschnitt`, body: 'Text' })) });
-    await route.fulfill({ status: 200, headers: cors, json: { candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }], modelVersion: 'mock' } });
-  });
-  return state;
-}
-
 test('Gemini key on the device: coach, body fat from photos, daily limit display and hard block on quota', async ({ page }) => {
   const google = await mockGemini(page);
   await completeOnboarding(page);

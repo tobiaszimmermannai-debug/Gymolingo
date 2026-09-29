@@ -20,7 +20,7 @@ if (!session.access_token) throw new Error(`Login failed: ${JSON.stringify(sessi
 const userId = session.user.id;
 
 const data = generateDemoData({ userId, today: todayISO(), weeks: 12, seed: 42 });
-const order = ['athlete_profiles', 'workout_plans', 'plan_days', 'plan_exercises', 'workout_sessions', 'workout_sets', 'meal_entries', 'weight_entries', 'step_entries', 'daily_checkins', 'body_measurements'];
+const order = ['athlete_profiles', 'workout_plans', 'plan_days', 'plan_exercises', 'workout_sessions', 'workout_sets', 'meal_entries', 'weight_entries', 'step_entries', 'daily_checkins', 'body_measurements', 'cardio_sessions'];
 for (const table of order) {
   const rows = data[table];
   for (let i = 0; i < rows.length; i += 500) {

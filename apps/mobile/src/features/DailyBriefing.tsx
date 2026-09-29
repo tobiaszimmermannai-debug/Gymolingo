@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { formatLastSeen, formatNumberDE } from '@gymolingo/core';
+import { CARDIO_LABELS_DE, formatLastSeen, formatNumberDE } from '@gymolingo/core';
 import { Card } from '@/ui/Card';
 import { Text } from '@/ui/Text';
 import { Row } from '@/ui/Screen';
@@ -28,6 +28,11 @@ export function DailyBriefing({ t }: { t: Today }) {
   else if (t.activeSession) lines.push({ icon: 'barbell-outline', text: 'Dein Training läuft noch – bring es zu Ende.' });
   else if (t.isTrainingDay && t.nextDay) lines.push({ icon: 'barbell-outline', text: `Heute: ${t.nextDay.day.name}${t.firstSuggestion ? ` – ${t.firstSuggestion.exercise} ${t.firstSuggestion.text}` : ''}` });
   else lines.push({ icon: 'bed-outline', text: 'Heute ist Ruhetag – Erholung gehört zum Plan.' });
+  if (t.cardioToday.length)
+    lines.push({
+      icon: 'walk-outline',
+      text: `Aktivität heute: ${t.cardioToday.map((c) => `${CARDIO_LABELS_DE[c.activity]} ${formatNumberDE(c.duration_min, 0)} min`).join(', ')} – ca. ${formatNumberDE(t.burnedKcal, 0)} kcal verbrannt${t.profile.add_exercise_calories ? ' (zum Kalorienziel addiert)' : ''}.`,
+    });
   if (t.remaining.kcal > 0) lines.push({ icon: 'restaurant-outline', text: `Noch ${formatNumberDE(t.remaining.kcal, 0)} kcal und ${formatNumberDE(Math.max(0, t.remaining.protein_g), 0)} g Protein offen.` });
   else lines.push({ icon: 'restaurant-outline', text: 'Kalorienziel für heute erreicht.' });
   const risk = t.reminderState.streakAtRisk;

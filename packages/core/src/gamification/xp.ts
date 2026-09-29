@@ -23,10 +23,14 @@ export interface DailyActivity {
   stepsHit: boolean;
   checkin: boolean;
   weighed: boolean;
+  /** walk / jog / run / EMS sessions and their calories */
+  cardio: number;
+  cardioKcal: number;
 }
 
 export const XP_RULES = {
   workout: 50,
+  cardio: 30,
   perSet: 2,
   maxSetXp: 40,
   pr: 25,
@@ -45,6 +49,7 @@ export const XP_RULES = {
 export function xpForDay(a: DailyActivity): number {
   let xp = 0;
   xp += Math.min(a.workouts, 2) * XP_RULES.workout;
+  xp += Math.min(a.cardio ?? 0, 2) * XP_RULES.cardio;
   xp += Math.min(a.workingSets * XP_RULES.perSet, XP_RULES.maxSetXp);
   xp += Math.min(a.prs * XP_RULES.pr, XP_RULES.maxPrXpPerDay);
   xp += Math.min(a.mealEntries * XP_RULES.mealEntry, XP_RULES.maxMealXp);
@@ -304,6 +309,8 @@ export function emptyActivity(date: ISODate): DailyActivity {
     stepsHit: false,
     checkin: false,
     weighed: false,
+    cardio: 0,
+    cardioKcal: 0,
   };
 }
 

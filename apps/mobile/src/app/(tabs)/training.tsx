@@ -3,6 +3,11 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  CARDIO_ICONS,
+  CARDIO_LABELS_DE,
+  cardioSummary,
+  INTENSITY_LABELS_DE,
+  type CardioActivity,
   completedSessions,
   formatDateDE,
   formatDuration,
@@ -36,6 +41,9 @@ export default function Training() {
   const today = todayISO();
 
   const recent = useMemo(() => completedSessions(sessions).slice(0, 5), [sessions]);
+  const cardio = useRows('cardio_sessions');
+  const recentCardio = useMemo(() => [...cardio].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)).slice(0, 5), [cardio]);
+  const cardioWeek = useMemo(() => cardioSummary(cardio, startOfWeek(today), today), [cardio, today]);
   const weekly = useMemo(() => volumeSeries(sessions, sets, addDays(startOfWeek(today), -7 * 7), today, 'week'), [sessions, sets, today]);
 
   const start = (name: string, dayId: string | null, exercises: Parameters<typeof startWorkoutForDay>[2]) => {
@@ -115,6 +123,31 @@ export default function Training() {
             router.push('/workout/active');
           }}
         />
+      </Section>
+
+      <Section title="Ausdauer & EMS" action={cardioWeek.sessions ? <Text variant="small" tone="secondary">Diese Woche: {cardioWeek.sessions}× · {formatNumberDE(cardioWeek.kcal, 0)} kcal</Text> : undefined}>
+        <Row gap={spacing.sm} wrap>
+          {(['walk', 'jog', 'run', 'ems'] as CardioActivity[]).map((a) => (
+            <Button key={a} title={`${CARDIO_ICONS[a]} ${CARDIO_LABELS_DE[a]}`} variant="secondary" size="sm" testID={`add-cardio-${a}`} onPress={() => router.push(`/cardio/new?activity=${a}`)} />
+          ))}
+        </Row>
+        {recentCardio.map((c) => (
+          <Card key={c.id} padding={spacing.md} onPress={() => router.push(`/cardio/${c.id}`)} testID="cardio-entry" accessibilityLabel={`${CARDIO_LABELS_DE[c.activity]} bearbeiten`}>
+            <Row>
+              <Text variant="h3">{CARDIO_ICONS[c.activity]}</Text>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMedium">
+                  {CARDIO_LABELS_DE[c.activity]}
+                  {c.activity === 'ems' ? ` · ${INTENSITY_LABELS_DE[c.intensity]}` : ''}
+                </Text>
+                <Text variant="small" tone="secondary">
+                  {formatDateDE(c.date, true)} · {formatNumberDE(c.duration_min, 0)} min{c.distance_km ? ` · ${formatNumberDE(c.distance_km, 1)} km` : ''}
+                </Text>
+              </View>
+              <Text variant="bodyMedium">{formatNumberDE(c.kcal, 0)} kcal</Text>
+            </Row>
+          </Card>
+        ))}
       </Section>
 
       <Section title="Volumen pro Woche">

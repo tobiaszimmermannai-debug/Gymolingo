@@ -169,6 +169,13 @@ export default function ProfileSettings() {
 
       <Card>
         <ToggleRow label="Körpergewicht tracken" description="Morgendliche Erinnerung, Gewichts-Serie und Trend" value={p.weight_tracking_enabled} onChange={(v) => saveProfile({ weight_tracking_enabled: v })} />
+        <ToggleRow
+          label="Verbrauch aus Lauf & EMS zum Kalorienziel addieren"
+          description="Wie bei MyFitnessPal: an Tagen mit Joggen, Laufen, Spazieren oder EMS darfst du entsprechend mehr essen (als Kohlenhydrate). Aus lassen, wenn dein Aktivitätslevel das schon abdeckt."
+          value={!!p.add_exercise_calories}
+          onChange={(v) => saveProfile({ add_exercise_calories: v })}
+          testID="toggle-exercise-calories"
+        />
       </Card>
     </Screen>
   );

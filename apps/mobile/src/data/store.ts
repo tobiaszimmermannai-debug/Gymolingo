@@ -32,6 +32,8 @@ export interface DBState {
     healthSource?: 'none' | 'apple_health' | 'health_connect';
     restTimerSound?: boolean;
     lastAutoReport?: string;
+    /** one-time switch of untouched privacy settings to the new defaults (only streaks + online status shared) */
+    privacyDefaultsV2?: boolean;
     friendsCount?: number;
     /** user agreed that progress photos may be sent to the AI (Gemini) for body fat estimates */
     aiPhotoConsent?: boolean;
@@ -39,6 +41,8 @@ export interface DBState {
     aiKey?: { configured: boolean; hint: string | null; fallback: boolean };
     /** Gemini key stored on this device only (never synced) */
     geminiKey?: string;
+    /** key shared by the group owner (Supabase, owner + friends) */
+    sharedAi?: { key: string; hint: string; ownerName: string; isOwner: boolean } | null;
     /** on-device AI limits: requests today, models blocked after a quota answer (ISO until) */
     aiUsage?: { day: string; count: number };
     aiBlocks?: Record<string, string>;

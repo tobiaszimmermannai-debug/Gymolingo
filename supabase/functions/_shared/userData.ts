@@ -30,7 +30,7 @@ async function fetchAll(sb: SupabaseClient, table: string, since?: { column: str
 
 export async function loadUserData(sb: SupabaseClient, userId: string, today: string): Promise<UserData | null> {
   const since = new Date(new Date(`${today}T12:00:00Z`).getTime() - 400 * 86400000).toISOString().slice(0, 10);
-  const [profiles, sessions, meals, weights, steps, checkins, pauses] = await Promise.all([
+  const [profiles, sessions, meals, weights, steps, checkins, pauses, cardio] = await Promise.all([
     fetchAll(sb, 'athlete_profiles'),
     fetchAll(sb, 'workout_sessions', { column: 'date', value: since }),
     fetchAll(sb, 'meal_entries', { column: 'date', value: since }),
@@ -38,6 +38,7 @@ export async function loadUserData(sb: SupabaseClient, userId: string, today: st
     fetchAll(sb, 'step_entries', { column: 'date', value: since }),
     fetchAll(sb, 'daily_checkins', { column: 'date', value: since }),
     fetchAll(sb, 'streak_pauses'),
+    fetchAll(sb, 'cardio_sessions', { column: 'date', value: since }),
   ]);
   const profile = profiles.find((p) => p.user_id === userId);
   if (!profile) return null;
@@ -58,5 +59,6 @@ export async function loadUserData(sb: SupabaseClient, userId: string, today: st
     steps,
     checkins: num(checkins, ['sleep_hours']),
     pauses,
+    cardio: num(cardio, ['duration_min', 'distance_km', 'kcal']),
   } as unknown as UserData;
 }

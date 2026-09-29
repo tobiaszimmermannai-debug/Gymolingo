@@ -1565,6 +1565,7 @@ function nextMilestone(current) {
 // src/gamification/xp.ts
 var XP_RULES = {
   workout: 50,
+  cardio: 30,
   perSet: 2,
   maxSetXp: 40,
   pr: 25,
@@ -1582,6 +1583,7 @@ var XP_RULES = {
 function xpForDay(a) {
   let xp = 0;
   xp += Math.min(a.workouts, 2) * XP_RULES.workout;
+  xp += Math.min(a.cardio ?? 0, 2) * XP_RULES.cardio;
   xp += Math.min(a.workingSets * XP_RULES.perSet, XP_RULES.maxSetXp);
   xp += Math.min(a.prs * XP_RULES.pr, XP_RULES.maxPrXpPerDay);
   xp += Math.min(a.mealEntries * XP_RULES.mealEntry, XP_RULES.maxMealXp);
@@ -1744,7 +1746,9 @@ function emptyActivity(date) {
     steps: 0,
     stepsHit: false,
     checkin: false,
-    weighed: false
+    weighed: false,
+    cardio: 0,
+    cardioKcal: 0
   };
 }
 function bestStreaksFrom(results) {
@@ -1956,6 +1960,96 @@ function openTasks(st) {
   return tasks;
 }
 
+// src/cardio/energy.ts
+var CARDIO_LABELS_DE = { walk: "Spazieren", jog: "Joggen", run: "Laufen", ems: "EMS-Training" };
+var CARDIO_ICONS = { walk: "\u{1F6B6}", jog: "\u{1F3C3}", run: "\u{1F3C3}\u200D\u2642\uFE0F", ems: "\u26A1" };
+var INTENSITY_LABELS_DE = { light: "Leicht", medium: "Mittel", intense: "Intensiv" };
+var DEFAULT_DURATION_MIN = { walk: 30, jog: 30, run: 30, ems: 20 };
+var COUNTS_AS_TRAINING = { walk: false, jog: true, run: true, ems: true };
+var EMS_MET = { light: 3.5, medium: 4.5, intense: 5.5 };
+var WALK_TABLE = [
+  [3.2, 2.8],
+  [4, 3],
+  [4.8, 3.5],
+  [5.6, 4.3],
+  [6.4, 5],
+  [7.2, 7],
+  [8, 8.3]
+];
+var RUN_TABLE = [
+  [6.4, 6],
+  [8, 8.3],
+  [8.4, 9],
+  [9.7, 9.8],
+  [10.8, 10.5],
+  [11.3, 11],
+  [12.1, 11.5],
+  [12.9, 11.8],
+  [13.8, 12.3],
+  [14.5, 12.8],
+  [16.1, 14.5],
+  [17.7, 16],
+  [19.3, 19]
+];
+var DEFAULT_SPEED = {
+  walk: { light: 4, medium: 5, intense: 6 },
+  jog: { light: 7, medium: 8, intense: 9 },
+  run: { light: 9.5, medium: 11, intense: 13 }
+};
+function interpolate(table, x) {
+  if (x <= table[0][0]) return table[0][1] * (x / table[0][0]) ** 0.5;
+  for (let i = 1; i < table.length; i++) {
+    const [x1, y1] = table[i];
+    if (x <= x1) {
+      const [x0, y0] = table[i - 1];
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+  }
+  const [xa, ya] = table[table.length - 2];
+  const [xb, yb] = table[table.length - 1];
+  return Math.min(23, yb + (yb - ya) / (xb - xa) * (x - xb));
+}
+function speedKmh(durationMin, distanceKm) {
+  if (!distanceKm || distanceKm <= 0 || !durationMin || durationMin <= 0) return null;
+  return distanceKm / (durationMin / 60);
+}
+function formatPace(durationMin, distanceKm) {
+  if (!distanceKm || distanceKm <= 0 || !durationMin) return null;
+  const pace = durationMin / distanceKm;
+  const m = Math.floor(pace);
+  const s = Math.round((pace - m) * 60);
+  return s === 60 ? `${m + 1}:00` : `${m}:${String(s).padStart(2, "0")}`;
+}
+function cardioMet(activity, intensity, durationMin, distanceKm) {
+  if (activity === "ems") return EMS_MET[intensity];
+  const speed = speedKmh(durationMin, distanceKm) ?? DEFAULT_SPEED[activity][intensity];
+  return speed >= 7.5 && activity === "walk" ? interpolate(RUN_TABLE, speed) : activity !== "walk" && speed < 6.4 ? interpolate(WALK_TABLE, speed) : interpolate(activity === "walk" ? WALK_TABLE : RUN_TABLE, speed);
+}
+function cardioKcal(s, weightKg) {
+  if (!(s.duration_min > 0) || !(weightKg > 0)) return 0;
+  return Math.round(cardioMet(s.activity, s.intensity, s.duration_min, s.distance_km) * weightKg * (s.duration_min / 60));
+}
+function cardioSummary(sessions, from, to) {
+  const out = { sessions: 0, minutes: 0, km: 0, kcal: 0, byActivity: {} };
+  for (const s of sessions) {
+    if (s.deleted || s.date < from || s.date > to) continue;
+    out.sessions++;
+    out.minutes += s.duration_min;
+    out.km += s.distance_km ?? 0;
+    out.kcal += s.kcal;
+    out.byActivity[s.activity] = (out.byActivity[s.activity] ?? 0) + 1;
+  }
+  out.km = Math.round(out.km * 10) / 10;
+  return out;
+}
+function burnedOn(date, sessions) {
+  return sessions.reduce((a, s) => !s.deleted && s.date === date ? a + s.kcal : a, 0);
+}
+function withExerciseCalories(profile, burnedKcal) {
+  if (!profile.add_exercise_calories || burnedKcal <= 0) return profile;
+  return { ...profile, calorie_target: profile.calorie_target + burnedKcal, carbs_target_g: Math.round(profile.carbs_target_g + burnedKcal / 4) };
+}
+
 // src/data/aggregate.ts
 function stepsByDate(entries) {
   const out = /* @__PURE__ */ new Map();
@@ -1974,8 +2068,10 @@ function stepsByDate(entries) {
   }
   return out;
 }
-function trainedDates(sessions) {
-  return new Set(sessions.filter((s) => !s.deleted && s.status === "completed").map((s) => s.date));
+function trainedDates(sessions, cardio = []) {
+  const out = new Set(sessions.filter((s) => !s.deleted && s.status === "completed").map((s) => s.date));
+  for (const c of cardio) if (!c.deleted && COUNTS_AS_TRAINING[c.activity]) out.add(c.date);
+  return out;
 }
 function buildDailyActivities(data, from, to) {
   const { profile } = data;
@@ -2020,6 +2116,12 @@ function buildDailyActivities(data, from, to) {
     a.steps = e.steps;
     a.stepsHit = profile.step_target > 0 && e.steps >= profile.step_target;
   }
+  for (const c of data.cardio ?? []) {
+    if (c.deleted || !inRange(c.date)) continue;
+    const a = get(c.date);
+    a.cardio += 1;
+    a.cardioKcal += c.kcal;
+  }
   for (const c of data.checkins) if (!c.deleted && inRange(c.date)) get(c.date).checkin = true;
   for (const w of data.weights) if (!w.deleted && inRange(w.date)) get(w.date).weighed = true;
   return [...map.values()].sort((a, b) => a.date < b.date ? -1 : 1);
@@ -2032,6 +2134,7 @@ function firstDataDate(data) {
   data.weights.forEach((w) => !w.deleted && push(w.date));
   data.steps.forEach((s) => !s.deleted && push(s.date));
   data.checkins.forEach((c) => !c.deleted && push(c.date));
+  (data.cardio ?? []).forEach((c) => !c.deleted && push(c.date));
   if (!dates.length) return null;
   return dates.reduce((m, d) => d < m ? d : m);
 }
@@ -2048,7 +2151,7 @@ function buildStreakInput(data, today, since, jokersPerMonth = 2) {
     },
     pauses: data.pauses.filter((x) => !x.deleted),
     jokersPerMonth,
-    trainedDates: trainedDates(data.sessions),
+    trainedDates: trainedDates(data.sessions, data.cardio),
     nutritionDates: new Set(acts.filter((a) => a.nutritionLogged).map((a) => a.date)),
     proteinDates: new Set(acts.filter((a) => a.proteinHit).map((a) => a.date)),
     stepsDates: new Set(acts.filter((a) => a.stepsHit).map((a) => a.date)),
@@ -2088,6 +2191,9 @@ function buildWeeklyReport(data, weekStartDate, opts = {}) {
   const trainedThisWeek = new Set(data.sets.filter((s) => isWorkingSet(s) && weekSessionIds.has(s.session_id)).map((s) => s.exercise_id));
   const plateaus = [...trainedThisWeek].filter((id) => detectPlateau(exerciseHistory(id, data.sessions, data.sets).filter((h) => h.date <= we))).map(name);
   const done = data.sessions.filter((s) => !s.deleted && s.status === "completed" && s.date >= ws && s.date <= we);
+  const cardioWeek = (data.cardio ?? []).filter((c) => !c.deleted && c.date >= ws && c.date <= we);
+  const cardioTrainings = cardioWeek.filter((c) => COUNTS_AS_TRAINING[c.activity]).length;
+  const cs = cardioSummary(cardioWeek, ws, we);
   const schedule = {
     type: p.schedule_type,
     weekdays: p.training_weekdays,
@@ -2121,13 +2227,14 @@ function buildWeeklyReport(data, weekStartDate, opts = {}) {
       plateaus
     },
     consistency: {
-      workoutsDone: done.length,
+      workoutsDone: done.length + cardioTrainings,
       workoutsPlanned: planned,
-      adherencePct: planned > 0 ? Math.round(Math.min(done.length, planned) / planned * 100) : null,
+      adherencePct: planned > 0 ? Math.round(Math.min(done.length + cardioTrainings, planned) / planned * 100) : null,
       workingSets: cur.reduce((a, x) => a + x.workingSets, 0),
       volumeKg: volume(ws, we),
       volumePrevKg: volume(prevWs, prevWe),
-      setsPerMuscle: spmLabeled
+      setsPerMuscle: spmLabeled,
+      cardio: cs.sessions ? { sessions: cs.sessions, minutes: cs.minutes, km: cs.km, kcal: cs.kcal, byActivity: Object.fromEntries(Object.entries(cs.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k], v])) } : void 0
     },
     nutrition: {
       daysLogged: logged.length,
@@ -2323,7 +2430,7 @@ function renderWeeklyReportText(s) {
   const c = s.consistency;
   sections.push({
     heading: "2. Trainingskonsistenz",
-    body: `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ""}. ${c.workingSets} Arbeitss\xE4tze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).`
+    body: `${c.workoutsDone} von ${c.workoutsPlanned} geplanten Trainings${c.adherencePct !== null ? ` (${c.adherencePct} %)` : ""}. ${c.workingSets} Arbeitss\xE4tze, Volumen ${formatNumberDE(c.volumeKg, 0)} kg (Vorwoche ${formatNumberDE(c.volumePrevKg, 0)} kg).` + (c.cardio ? ` Ausdauer & EMS: ${Object.entries(c.cardio.byActivity).map(([k, v]) => `${k} ${v}\xD7`).join(", ")}, ${c.cardio.minutes} min${c.cardio.km ? `, ${formatNumberDE(c.cardio.km)} km` : ""}, ca. ${formatNumberDE(c.cardio.kcal, 0)} kcal.` : "")
   });
   const n = s.nutrition;
   sections.push({
@@ -2413,6 +2520,7 @@ function buildCoachContext(data, today, lookup, birthYear, todayPlan = null) {
       kcal_remaining: rem.kcal,
       protein_remaining: rem.protein_g,
       workout_done: acts.some((a) => a.date === today && a.workouts > 0),
+      cardio_kcal_today: acts.find((a) => a.date === today)?.cardioKcal ?? 0,
       steps: acts.find((a) => a.date === today)?.steps || null
     },
     last_28_days: {
@@ -2432,6 +2540,18 @@ function buildCoachContext(data, today, lookup, birthYear, todayPlan = null) {
       weekly_rate_30d: ws.weeklyRate30,
       entries_30d: ws.daysLogged30
     },
+    cardio_28_days: (() => {
+      const c = cardioSummary(data.cardio ?? [], from, today);
+      const last = [...data.cardio ?? []].filter((x) => !x.deleted).sort((a, b) => b.date.localeCompare(a.date))[0];
+      return {
+        sessions: c.sessions,
+        minutes: c.minutes,
+        km: c.km,
+        kcal: c.kcal,
+        by_activity: Object.fromEntries(Object.entries(c.byActivity).map(([k, v]) => [CARDIO_LABELS_DE[k], v])),
+        last: last ? `${last.date}: ${CARDIO_LABELS_DE[last.activity]} ${last.duration_min} min${last.distance_km ? `, ${formatNumberDE(last.distance_km)} km` : ""}${last.activity === "ems" ? ` (${last.intensity})` : ""}, ${last.kcal} kcal` : null
+      };
+    })(),
     key_lifts,
     today_plan: todayPlan,
     data_gaps: gaps
@@ -2479,6 +2599,17 @@ function answerOffline(ctx, question) {
     if (lift.best_e1rm) lines.push(`Bestes gesch\xE4tztes 1RM: ${formatNumberDE(lift.best_e1rm)} kg.`);
     lines.push(`Vorschlag f\xFCrs n\xE4chste Training: ${lift.next_suggestion}.`);
     if (lift.plateau) lines.push("Seit einigen Einheiten stagniert die Leistung \u2013 eine leichtere Woche oder ein anderer Wiederholungsbereich kann helfen.");
+    return lines.join("\n");
+  }
+  if (has("lauf", "jogg", "renn", "ems", "cardio", "ausdauer", "spazier", "verbrannt", "verbrauch")) {
+    const c = ctx.cardio_28_days;
+    if (!c.sessions) return "In den letzten 4 Wochen ist noch kein Lauf-, Spazier- oder EMS-Training eingetragen. Unter Training \u2192 \u201EAusdauer & EMS\u201C tr\xE4gst du es in 10 Sekunden ein \u2013 der Kalorienverbrauch wird automatisch berechnet.";
+    lines.push(`Letzte 4 Wochen: ${c.sessions} Einheiten, ${c.minutes} Minuten${c.km ? `, ${formatNumberDE(c.km)} km` : ""}, ca. ${formatNumberDE(c.kcal, 0)} kcal verbrannt.`);
+    const parts = Object.entries(c.by_activity).map(([k, v]) => `${k} ${v}\xD7`);
+    if (parts.length) lines.push(`Verteilung: ${parts.join(", ")}.`);
+    if (c.last) lines.push(`Zuletzt: ${c.last}.`);
+    if (ctx.today_status.cardio_kcal_today) lines.push(`Heute bisher: ${ctx.today_status.cardio_kcal_today} kcal durch Aktivit\xE4t.`);
+    lines.push("Die Werte sind Sch\xE4tzungen (MET-Methode, EMS nach Studienwerten) \u2013 ideal f\xFCr den Verlauf.");
     return lines.join("\n");
   }
   if (has("protein", "eiweiss")) {
@@ -2912,6 +3043,7 @@ function generateDemoData(opts) {
   const steps = [];
   const checkins = [];
   const measurements = [];
+  const cardio = [];
   let trueWeight = startWeight;
   for (const date of dateRange(start, opts.today)) {
     const wd = weekdayIndex(date);
@@ -2968,6 +3100,14 @@ function generateDemoData(opts) {
       steps.push({ ...base(date, 21), date, steps: Math.round(Math.max(2500, 9e3 + noise(2500) + (wd >= 5 ? 1500 : 0))), source: "manual" });
       if (rnd() < 0.75) checkins.push({ ...base(date, 21), date, mood: Math.max(1, Math.min(5, Math.round(3.8 + noise(0.8)))), energy: Math.max(1, Math.min(5, Math.round(3.5 + noise(0.9)))), sleep_hours: Math.round((7 + noise(0.8)) * 2) / 2, note: null, day_closed: true, completed_at: ts(date, 21) });
     }
+    if (!isToday && (wd === 2 || wd === 5 || wd === 6 && rnd() < 0.5)) {
+      const activity = wd === 2 ? "ems" : wd === 5 ? "jog" : "walk";
+      const duration_min = activity === "ems" ? 20 : activity === "jog" ? Math.round(30 + rnd() * 12) : Math.round(40 + rnd() * 30);
+      const distance_km = activity === "ems" ? null : Math.round(duration_min / 60 * (activity === "jog" ? 8.6 + noise(0.5) : 5 + noise(0.3)) * 10) / 10;
+      const intensity = activity === "ems" ? rnd() < 0.6 ? "intense" : "medium" : "medium";
+      const row = { activity, duration_min, distance_km, intensity };
+      cardio.push({ ...base(date, activity === "ems" ? 18 : 9), date, ...row, kcal: cardioKcal(row, trueWeight), kcal_manual: false, note: null });
+    }
     if (wd === 6) {
       const lost = startWeight - trueWeight;
       measurements.push({ ...base(date, 9), date, waist_cm: Math.round((94 - lost * 0.9 + noise(0.4)) * 10) / 10, chest_cm: Math.round((106 - lost * 0.3 + noise(0.4)) * 10) / 10, hips_cm: Math.round((102 - lost * 0.4 + noise(0.4)) * 10) / 10, arm_cm: Math.round((37 + noise(0.2)) * 10) / 10, thigh_cm: Math.round((60 - lost * 0.2 + noise(0.3)) * 10) / 10, neck_cm: 40, note: null });
@@ -2984,7 +3124,8 @@ function generateDemoData(opts) {
     weight_entries: weights,
     step_entries: steps,
     daily_checkins: checkins,
-    body_measurements: measurements
+    body_measurements: measurements,
+    cardio_sessions: cardio
   };
 }
 
@@ -3280,9 +3421,14 @@ export {
   BADGE_MAP,
   BODY_FAT_SCHEMA,
   BODY_FAT_SYSTEM,
+  CARDIO_ICONS,
+  CARDIO_LABELS_DE,
   COACH_SYSTEM_PROMPT,
+  COUNTS_AS_TRAINING,
+  DEFAULT_DURATION_MIN,
   DEFAULT_REMINDER_SETTINGS,
   EMPTY_TOTALS,
+  EMS_MET,
   EQUIPMENT_LABELS_DE,
   EXERCISES,
   EXERCISE_MAP,
@@ -3292,6 +3438,7 @@ export {
   GEMINI_TEXT_MODEL,
   GEMINI_VISION_MODEL,
   GeminiError,
+  INTENSITY_LABELS_DE,
   MAX_REPS_FOR_ESTIMATE,
   MEAL_LABELS_DE,
   MEAL_ORDER,
@@ -3326,7 +3473,11 @@ export {
   buildRecommendations,
   buildStreakInput,
   buildWeeklyReport,
+  burnedOn,
   calculateTargets,
+  cardioKcal,
+  cardioMet,
+  cardioSummary,
   completedSessions,
   computeAllStreaks,
   computeDailyStreak,
@@ -3357,6 +3508,7 @@ export {
   formatKg,
   formatLastSeen,
   formatNumberDE,
+  formatPace,
   formatSigned,
   geminiGenerate,
   geminiGuarded,
@@ -3418,6 +3570,7 @@ export {
   setsPerMuscle,
   shouldApplyRemote,
   smoothedTrend,
+  speedKmh,
   startOfMonth,
   startOfWeek,
   stepsByDate,
@@ -3442,6 +3595,7 @@ export {
   weeklyQuota,
   weightForReps,
   weightSummary,
+  withExerciseCalories,
   workingSets,
   xpForDay,
   xpForLevel

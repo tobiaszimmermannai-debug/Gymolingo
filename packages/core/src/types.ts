@@ -54,6 +54,8 @@ export interface AthleteProfile extends BaseRow {
   step_target: number;
   weekly_rate_kg: number; // planned change per week (negative = loss)
   weight_tracking_enabled: boolean;
+  /** add calories burned by cardio/EMS to the daily calorie target (like MyFitnessPal) */
+  add_exercise_calories?: boolean;
   onboarding_completed: boolean;
 }
 
@@ -274,6 +276,21 @@ export interface StepEntry extends BaseRow {
   date: ISODate;
   steps: number;
   source: StepSource;
+}
+
+export type CardioActivity = 'walk' | 'jog' | 'run' | 'ems';
+export type CardioIntensity = 'light' | 'medium' | 'intense';
+
+/** Endurance session (walk / jog / run) or EMS training. kcal is computed (MET) unless set manually. */
+export interface CardioSession extends BaseRow {
+  date: ISODate;
+  activity: CardioActivity;
+  duration_min: number;
+  distance_km: number | null;
+  intensity: CardioIntensity;
+  kcal: number;
+  kcal_manual: boolean;
+  note: string | null;
 }
 
 export interface DailyCheckin extends BaseRow {
