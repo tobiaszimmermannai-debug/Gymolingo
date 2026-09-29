@@ -150,6 +150,6 @@ Letzte Aktualisierung: 2026-09-30
 - Stand „Freunde einladen": core 134/134, DB 79/79, E2E lokal 17/17, E2E Backend 6/6, Typecheck grün (Edge unverändert 38/38).
 
 ## Nächste konkrete Aufgabe
-1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Status-Update vom Nutzer eingespielt (30.09.); `supabase/updates/2026-09-30-invites.sql` muss noch einmal ausgeführt werden (Deploy-Check meldet „Freunde einladen“). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
+1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Updates „Status“ und „Einladungen“ vom Nutzer eingespielt (30.09.), Nutzer bestätigt: alles läuft. Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.
 2. Visuelle QA fortsetzen: `VISUAL=1 SHOT_DIR=… npx playwright test e2e/visual.spec.ts --project=local` (Demo-Daten, Leerzustände + langer Name, Tablet) – zuletzt geprüft: Home, Training, Progress, Bericht, Community.
 3. Optional: Server-Push (Expo Push) – nur falls kostenlos gewünscht; lokale Notifications decken den Bedarf.
