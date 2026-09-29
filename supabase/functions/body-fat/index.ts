@@ -3,7 +3,8 @@
  * Explicitly an estimate (typical error ±3–5 percentage points): the app shows
  * a range and the user decides whether to save it. Photos are not stored here.
  */
-import { describeError, generateVision, type Part } from '../_shared/gemini.ts';
+import { describeError, type Part } from '../_shared/gemini.ts';
+import { generatePhoto } from '../_shared/guard.ts';
 import { resolveGeminiKey } from '../_shared/userKey.ts';
 import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
@@ -80,7 +81,7 @@ Deno.serve(async (req) => {
   parts.push({ text: facts.length ? `Angaben: ${facts.join(', ')}.` : 'Keine weiteren Angaben.' });
 
   try {
-    const r = await generateVision(key, { system: SYSTEM, jsonSchema: SCHEMA, temperature: 0.2, contents: [{ role: 'user', parts }] });
+    const r = await generatePhoto(sb, key, { system: SYSTEM, jsonSchema: SCHEMA, temperature: 0.2, contents: [{ role: 'user', parts }] });
     if (r.blocked || !r.text) return json({ error: 'Die Fotos konnten nicht ausgewertet werden. Nutze alternativ die Berechnung aus deinen Körpermaßen.' }, 422);
     const o = JSON.parse(r.text) as Record<string, unknown>;
     const clamp = (v: unknown) => Math.round(Math.max(3, Math.min(60, Number(v) || 0)) * 10) / 10;

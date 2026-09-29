@@ -3,7 +3,8 @@
  * The result is explicitly an estimate – the app stores it with is_estimate = true
  * and lets the user correct amounts. The photo is not stored.
  */
-import { describeError, generateVision } from '../_shared/gemini.ts';
+import { describeError } from '../_shared/gemini.ts';
+import { generatePhoto } from '../_shared/guard.ts';
 import { resolveGeminiKey } from '../_shared/userKey.ts';
 import { consumeAiQuota } from '../_shared/quota.ts';
 import { json, preflight } from '../_shared/http.ts';
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
   if (!(await consumeAiQuota(sb).catch(() => false))) return json({ error: 'Tageslimit für KI-Anfragen erreicht – bitte morgen wieder oder manuell eintragen.' }, 429);
 
   try {
-    const r = await generateVision(key, {
+    const r = await generatePhoto(sb, key, {
       system: SYSTEM,
       jsonSchema: SCHEMA,
       temperature: 0.2,

@@ -45,7 +45,7 @@ async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> 
       setPrefs({ aiKey: { configured: false, hint: null, fallback: false } });
       throw new AiError(payload.error ?? 'Bitte hinterlege deinen Gemini-Schlüssel.', 'no_key');
     }
-    if (ctx?.status === 429) throw new AiError('Zu viele Anfragen – bitte kurz warten.', 'rate_limited');
+    if (ctx?.status === 429) throw new AiError(payload?.error ?? 'Das KI-Kontingent ist aufgebraucht – bitte später erneut versuchen.', 'rate_limited');
     throw new AiError(payload?.error ?? error.message ?? 'KI-Anfrage fehlgeschlagen', 'failed');
   }
   return data as T;

@@ -1,9 +1,10 @@
 # Deploys database schema (RLS, community, AI quota, personal AI keys) and edge
 # functions to a FREE Supabase project. Runs only after the project is configured:
 #   Secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD
-#   Variables: SUPABASE_PROJECT_REF, (optional) AI_DAILY_LIMIT
-# AI stays free: every user stores their own free Gemini key in the app.
-# (Optional secret GEMINI_API_KEY = shared key for everyone – only with a paid Google account.)
+#   Variables: SUPABASE_PROJECT_REF, (optional) AI_DAILY_LIMIT, AI_GLOBAL_DAILY_LIMIT
+# AI: optional secret GEMINI_API_KEY (shared free-tier key) and/or personal keys in the app.
+# Hard limits: per user/day, all users/day, and an automatic block when Google reports
+# that a free quota is used up – no paid usage is possible without a billing account.
 name: Deploy backend (Supabase)
 on:
   push:
@@ -35,12 +36,13 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '40' }}
+          AI_GLOBAL_DAILY_LIMIT: ${{ vars.AI_GLOBAL_DAILY_LIMIT || '150' }}
         run: |
           # encryption secret for the personal Gemini keys – generated once, never shown
           if ! npx supabase secrets list | grep -q AI_KEY_SECRET; then
             npx supabase secrets set AI_KEY_SECRET="$(openssl rand -base64 32)"
           fi
-          npx supabase secrets set AI_DAILY_LIMIT="$AI_DAILY_LIMIT"
+          npx supabase secrets set AI_DAILY_LIMIT="$AI_DAILY_LIMIT" AI_GLOBAL_DAILY_LIMIT="$AI_GLOBAL_DAILY_LIMIT"
           if [ -n "$GEMINI_API_KEY" ]; then
             npx supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY"
           fi

@@ -84,7 +84,7 @@ Letzte Aktualisierung: 2026-09-28
 - ✅ Deterministische Coach-Statistiken + Offline-Coach (regelbasiert) in core
 - ✅ Wochenbericht (7 Abschnitte, 3 Empfehlungen) regelbasiert in core
 - ✅ Coach-Chat (Offline-Coach kennt heutigen Plan) + Wochenbericht-Screen, automatischer Bericht 1×/Tag, Live-Neuberechnung, Leerzustand für Wochen ohne Daten (öffnet nie eine Woche vor dem Start)
-- ✅ Edge Functions `coach`, `meal-photo`, `body-fat`, `ai-key` auf Gemini (persönliche Schlüssel, JSON-Schema, Safety/429-Fallback, Flash→Flash-Lite, Tageslimit) – 33 Checks gegen lokales Supabase + Mock-Gemini
+- ✅ Edge Functions `coach`, `meal-photo`, `body-fat`, `ai-key` auf Gemini (persönliche Schlüssel, JSON-Schema, Safety/429-Fallback, Flash→Flash-Lite, Tageslimit) – 38 Checks gegen lokales Supabase + Mock-Gemini (inkl. Sperre bei Kontingent-Ende)
 
 ### 10. Progress-Dashboard
 - ✅ Zeiträume 7T/30T/90T/6M/1J/Alles, Vergleich zur Vorperiode, Gewicht, Kraft, Volumen, Muskelgruppen, Kalorien, Protein, Schritte, Serien, PRs
@@ -98,8 +98,8 @@ Letzte Aktualisierung: 2026-09-28
 
 ### 12. Tests
 - ✅ core: 106 Unit-Tests (Vitest)
-- ✅ DB: 41 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Tageslimit, KI-Schlüssel)
-- ✅ Edge Functions: 33 Checks (`npm run test:edge`)
+- ✅ DB: 49 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren)
+- ✅ Edge Functions: 38 Checks (`npm run test:edge`)
 - ✅ E2E lokal (12, inkl. KFA Navy): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
 - ✅ E2E Backend (6): Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre/Challenges, Kontolöschung, Offline-Sync, Fortschrittsbilder, KI-Schlüssel einrichten + KI-KFA aus Fotos (gemockte Functions)
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
@@ -123,6 +123,8 @@ Letzte Aktualisierung: 2026-09-28
 ## Entscheidungen
 - **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
+- Testphase (Nutzerwunsch): **ein gemeinsamer Gratis-Schlüssel** (`GEMINI_API_KEY`) für 2 Personen; harte Grenzen: pro Person 40/Tag, gesamt 150/Tag (`ai_usage_global`), Circuit Breaker `ai_model_blocks` bei 429 (Tageskontingent → Sperre bis Reset, Minutenlimit → Sperre für RetryInfo-Dauer).
+- Edge Functions prüfen den Nutzer selbst (`verify_jwt = false`, `auth.getUser`) – kompatibel mit neuen Supabase-Signaturschlüsseln; `apikey` wird aus der Anfrage übernommen.
 - App-Icon blau (Verlauf #3B82F6→#1D4ED8, weißes G); App-Oberfläche bleibt Anthrazit/Lime.
 - KFA: primär aus Fotos (startet automatisch nach neuem Foto, Einwilligung einmalig), Navy-Formel als Alternative ohne KI.
 - Hosting der PWA auf GitHub Pages (Repo öffentlich) mit `EXPO_BASE_URL=/Gymolingo`; `scripts/pwa-base.mjs` passt index.html/Manifest an und legt 404.html als SPA-Fallback an.
@@ -132,7 +134,7 @@ Letzte Aktualisierung: 2026-09-28
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Eigene Gemini-Schlüssel, blaues Icon": core 106/106, DB 41/41, Edge 33/33, E2E lokal 12/12, E2E Backend 6/6, Typecheck grün.
+- Stand „KI-Sperren, gemeinsamer Test-Schlüssel": core 106/106, DB 49/49, Edge 38/38, E2E lokal 12/12, E2E Backend 6/6, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
 1. Nutzer richtet Supabase + GitHub ein (Pages macht er später) (Schritte in `docs/KOSTENLOS_BETREIBEN.md`) → danach Live-Test gegen echtes Projekt (Migrationen auf gehostetem Supabase, echte Gemini-Antworten, Prompt-Feinschliff).

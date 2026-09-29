@@ -6,7 +6,9 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.1
 import type { UserData } from './core.mjs';
 
 export function userClient(req: Request): SupabaseClient {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  // the app's public key (publishable or legacy anon) arrives with every request
+  const apiKey = Deno.env.get('SUPABASE_ANON_KEY') || req.headers.get('apikey') || '';
+  return createClient(Deno.env.get('SUPABASE_URL')!, apiKey, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     auth: { persistSession: false },
   });

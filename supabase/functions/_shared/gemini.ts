@@ -13,9 +13,32 @@ export type Part = { text: string } | { inlineData: { mimeType: string; data: st
 export type Turn = { role: 'user' | 'model'; parts: Part[] };
 
 export class GeminiError extends Error {
-  constructor(message: string, public status: number, public code: 'rate_limited' | 'bad_key' | 'bad_request' | 'unavailable') {
+  constructor(
+    message: string,
+    public status: number,
+    public code: 'rate_limited' | 'bad_key' | 'bad_request' | 'unavailable',
+    /** for rate limits: how long to stop calling this model, and whether it is the daily quota */
+    public retryAfterSec = 60,
+    public daily = false,
+  ) {
     super(message);
   }
+}
+
+/** Seconds until the free quota resets (Google resets daily quotas at midnight Pacific time). */
+function secondsUntilDailyReset(now = new Date()): number {
+  const pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const next = new Date(pt);
+  next.setHours(24, 0, 0, 0);
+  return Math.max(60, Math.round((next.getTime() - pt.getTime()) / 1000) + 60);
+}
+
+/** Reads Google's QuotaFailure / RetryInfo details of a 429 answer. */
+function rateLimitInfo(details: unknown): { daily: boolean; retryAfterSec: number } {
+  const text = JSON.stringify(details ?? '');
+  if (/PerDay/i.test(text)) return { daily: true, retryAfterSec: secondsUntilDailyReset() };
+  const m = text.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  return { daily: false, retryAfterSec: m ? Math.ceil(Number(m[1])) : 60 };
 }
 
 export function geminiKey(): string | null {
@@ -59,14 +82,23 @@ export async function generate(
     throw new GeminiError(`KI-Dienst nicht erreichbar (${e instanceof Error ? e.name : 'Netzwerk'}).`, 502, 'unavailable');
   }
   const body = (await res.json().catch(() => ({}))) as {
-    error?: { message?: string; status?: string };
+    error?: { message?: string; status?: string; details?: unknown };
     candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
     promptFeedback?: { blockReason?: string };
     modelVersion?: string;
   };
   if (!res.ok) {
     const msg = body.error?.message ?? res.statusText;
-    if (res.status === 429) throw new GeminiError('Das KI-Kontingent ist gerade ausgeschöpft – bitte später erneut versuchen.', 429, 'rate_limited');
+    if (res.status === 429) {
+      const info = rateLimitInfo(body.error?.details);
+      throw new GeminiError(
+        info.daily ? 'Das kostenlose KI-Tageskontingent ist aufgebraucht – die KI ist bis morgen gesperrt.' : 'Das KI-Kontingent ist gerade ausgeschöpft – bitte in einer Minute erneut versuchen.',
+        429,
+        'rate_limited',
+        info.retryAfterSec,
+        info.daily,
+      );
+    }
     if (res.status === 401 || res.status === 403 || /API key/i.test(msg)) throw new GeminiError('Der Gemini-Schlüssel auf dem Server ist ungültig.', 503, 'bad_key');
     if (res.status === 400) throw new GeminiError(`Ungültige KI-Anfrage: ${msg}`, 400, 'bad_request');
     throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}).`, 502, 'unavailable');
@@ -82,16 +114,6 @@ export async function generate(
     .join('')
     .trim();
   return { text: text || null, model: used, blocked: false };
-}
-
-/** Photo analysis: better vision model first, Flash-Lite when its free quota is used up. */
-export async function generateVision(key: string, p: Parameters<typeof generate>[1]) {
-  try {
-    return await generate(key, { ...p, model: VISION_MODEL });
-  } catch (e) {
-    if (e instanceof GeminiError && e.code === 'rate_limited' && VISION_MODEL !== MODEL) return generate(key, { ...p, model: MODEL });
-    throw e;
-  }
 }
 
 /** Checks a key with a cheap metadata request (no tokens used). */
