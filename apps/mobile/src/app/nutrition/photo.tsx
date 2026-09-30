@@ -121,11 +121,15 @@ export default function PhotoMeal() {
       )}
       <Row>
         <Button title="Kamera" icon="camera-outline" variant="secondary" style={{ flex: 1 }} onPress={() => pick(true)} />
-        <Button title="Galerie" icon="images-outline" variant="secondary" style={{ flex: 1 }} onPress={() => pick(false)} />
+        <Button title="Galerie" icon="images-outline" variant="secondary" style={{ flex: 1 }} onPress={() => pick(false)} testID="meal-photo-gallery" />
       </Row>
       <Input label="Hinweis (optional)" value={hint} onChangeText={setHint} placeholder="z. B. mit Olivenöl gebraten, 2 Eier" />
-      <Button title="Analysieren" icon="sparkles" onPress={analyze} disabled={!image || loading} loading={loading} />
-      {error && <Text tone="danger">{error}</Text>}
+      <Button title="Analysieren" icon="sparkles" onPress={analyze} disabled={!image || loading} loading={loading} testID="meal-photo-analyze" />
+      {error && (
+        <Text tone="danger" testID="meal-photo-error">
+          {error}
+        </Text>
+      )}
       {loading && <ActivityIndicator color={colors.accent} />}
       {items && (
         <>
@@ -135,7 +139,7 @@ export default function PhotoMeal() {
             </Text>
           ) : null}
           {items.map((i, idx) => (
-            <Card key={idx} padding={spacing.md}>
+            <Card key={idx} padding={spacing.md} testID="meal-photo-item">
               <Row>
                 <Input containerStyle={{ flex: 1 }} value={i.name} onChangeText={(v) => setItem(idx, { name: v })} accessibilityLabel="Name" />
                 <IconButton icon="close" size={32} accessibilityLabel="Entfernen" onPress={() => setItems((arr) => arr!.filter((_, j) => j !== idx))} />

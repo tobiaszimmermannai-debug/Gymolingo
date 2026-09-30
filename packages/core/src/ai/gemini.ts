@@ -8,6 +8,11 @@ export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
 /** auto-updated aliases: Flash-Lite has the largest free quota, Flash sees photos better */
 export const GEMINI_TEXT_MODEL = 'gemini-flash-lite-latest';
 export const GEMINI_VISION_MODEL = 'gemini-flash-latest';
+/**
+ * Extra free models (own quota) tried when the aliases are overloaded ("high demand").
+ * Unknown names answer 404 and are skipped, so this list costs nothing.
+ */
+export const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
 
 export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 export type GeminiTurn = { role: 'user' | 'model'; parts: GeminiPart[] };
@@ -17,13 +22,17 @@ export interface GeminiConfig {
   textModel?: string;
   visionModel?: string;
   fetchImpl?: typeof fetch;
+  fallbackModels?: string[];
+  /** waits before retrying an overloaded model (Google 5xx "high demand"); default 1 s, 2.5 s */
+  retryDelaysMs?: number[];
 }
 
 export class GeminiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code: 'rate_limited' | 'bad_key' | 'bad_request' | 'unavailable',
+    /** overloaded = Google 5xx (high demand), timeout = no answer in time, not_found = model alias unknown, unavailable = no connection */
+    public code: 'rate_limited' | 'bad_key' | 'bad_request' | 'unavailable' | 'overloaded' | 'timeout' | 'not_found',
     /** rate limits: how long to stop calling this model, and whether the daily quota is used up */
     public retryAfterSec = 60,
     public daily = false,
@@ -102,7 +111,8 @@ export async function geminiGenerate(key: string, p: GenerateParams, cfg: Gemini
       p.timeoutMs ?? 45000,
     );
   } catch (e) {
-    throw new GeminiError(`KI-Dienst nicht erreichbar (${e instanceof Error ? e.name : 'Netzwerk'}).`, 502, 'unavailable');
+    if (e instanceof Error && e.name === 'AbortError') throw new GeminiError('Die Google-KI hat zu lange gebraucht – bitte erneut versuchen.', 504, 'timeout');
+    throw new GeminiError(`Keine Verbindung zur Google-KI – bist du online? (${e instanceof Error ? e.message || e.name : 'Netzwerk'})`, 502, 'unavailable');
   }
   const body = (await res.json().catch(() => ({}))) as {
     error?: { message?: string; details?: unknown };
@@ -124,7 +134,9 @@ export async function geminiGenerate(key: string, p: GenerateParams, cfg: Gemini
     }
     if (res.status === 401 || res.status === 403 || /API key/i.test(msg)) throw new GeminiError('Der Gemini-Schlüssel ist ungültig.', 503, 'bad_key');
     if (res.status === 400) throw new GeminiError(`Ungültige KI-Anfrage: ${msg}`, 400, 'bad_request');
-    throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}).`, 502, 'unavailable');
+    if (res.status === 404) throw new GeminiError(`KI-Modell ${p.model} ist bei Google nicht verfügbar.`, 502, 'not_found');
+    if (res.status >= 500) throw new GeminiError(`Die Google-KI ist gerade überlastet (hohe Nachfrage) – bitte in ein paar Minuten erneut versuchen. (${res.status})`, 503, 'overloaded');
+    throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}: ${msg}).`, 502, 'unavailable');
   }
   const used = body.modelVersion ?? p.model;
   if (body.promptFeedback?.blockReason) return { text: null, model: used, blocked: true };
@@ -185,18 +197,38 @@ export interface GeminiBlockStore {
 /**
  * Tries the models in order, skipping blocked ones. A quota answer blocks that model
  * (daily quota: until reset; per-minute limit: for Google's retry delay) – Google is
- * not called again meanwhile. Throws a rate_limited GeminiError when all are blocked.
+ * not called again meanwhile. An overloaded model (Google 5xx, "high demand") is
+ * retried twice with a short pause; after that, a timeout or an unknown model alias
+ * the next model is tried. Throws the last error when no model answered.
+ * quotaFallback=false: a used-up quota stops right away instead of moving on (text tasks –
+ * the fallback model is only there for overloads).
  */
-export async function geminiGuarded(key: string, models: string[], p: Omit<GenerateParams, 'model'>, store: GeminiBlockStore, cfg: GeminiConfig = {}) {
+export async function geminiGuarded(key: string, models: string[], p: Omit<GenerateParams, 'model'>, store: GeminiBlockStore, cfg: GeminiConfig = {}, opts: { quotaFallback?: boolean } = {}) {
+  const delays = cfg.retryDelaysMs ?? [1000, 2500];
   let last: GeminiError | null = null;
   for (const model of [...new Set(models)]) {
-    if (await store.isBlocked(model)) continue;
-    try {
-      return await geminiGenerate(key, { ...p, model }, cfg);
-    } catch (e) {
-      if (!(e instanceof GeminiError) || e.code !== 'rate_limited') throw e;
-      last = e;
-      await store.block(model, e.retryAfterSec, e.daily ? 'daily quota' : 'rate limit');
+    if (await store.isBlocked(model)) {
+      if (opts.quotaFallback === false) break; // paused for quota → do not route around it
+      continue;
+    }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await geminiGenerate(key, { ...p, model }, cfg);
+      } catch (e) {
+        if (!(e instanceof GeminiError)) throw e;
+        if (e.code === 'rate_limited') {
+          await store.block(model, e.retryAfterSec, e.daily ? 'daily quota' : 'rate limit');
+          if (opts.quotaFallback === false) throw e;
+        } else if (e.code === 'overloaded' && attempt < delays.length) {
+          await new Promise((r) => setTimeout(r, delays[attempt]));
+          continue;
+        } else if (e.code !== 'overloaded' && e.code !== 'timeout' && e.code !== 'not_found') {
+          throw e;
+        }
+        // keep the more useful message: "overloaded" beats a quota note of the fallback model
+        if (!last || last.code === 'rate_limited') last = e;
+        break;
+      }
     }
   }
   throw last ?? new GeminiError('Das kostenlose KI-Kontingent ist aufgebraucht – die KI ist vorübergehend gesperrt.', 429, 'rate_limited', 60, true);

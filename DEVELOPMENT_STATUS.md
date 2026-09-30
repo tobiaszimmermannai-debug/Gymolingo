@@ -105,10 +105,10 @@ Letzte Aktualisierung: 2026-09-30
 - ✅ DSGVO: Export (JSON), Konto-/Datenlöschung, Privacy by default
 
 ### 12. Tests
-- ✅ core: 143 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, Ausdauer/EMS, Aktivitäten-Katalog, Status)
+- ✅ core: 151 Unit-Tests (Vitest, inkl. Gemini-Client/Circuit Breaker, 503-Überlastung/Retry/Fallback, Ausdauer/EMS, Aktivitäten-Katalog, Status)
 - ✅ DB: 83 pgTAP-Assertions (RLS, LWW, Community, Privatsphäre, KI-Limits, KI-Schlüssel, Sperren, Online-Status, Gruppen-Schlüssel, Status, Einladungen, Aktivitäten); `setup.sql` (13 Migrationen)
 - ✅ Edge Functions: 38 Checks (`npm run test:edge`)
-- ✅ E2E lokal (18, inkl. Aktivitäten-Katalog (Fußball/Staubsaugen/Sex), App teilen/QR/WhatsApp, Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
+- ✅ E2E lokal (19, inkl. Mahlzeitfoto bei Google-Überlastung (Fallback + Meldung + kein Zählerverbrauch), Aktivitäten-Katalog (Fußball/Staubsaugen/Sex), App teilen/QR/WhatsApp, Status-Meldungen, Lauf/EMS, inkl. KFA Navy und KI mit Geräte-Schlüssel gegen simuliertes Google: Coach, KFA aus Foto, Zähler, Sperre): Onboarding, Training+Progression+PR, Nutrition, Körper/Check-in/Progress/Erfolge/Settings/Export/Löschen, Coach, PWA-Offline-Start
 - ✅ E2E Backend (6, Zwei-Geräte-Sync inkl. Katalog-Aktivität): Einladungslink → Onboarding → Konto → sofort befreundet, Link erneuern; Registrierung/Wiederherstellung/Zwei-Geräte-Sync, Freunde/Privatsphäre-Voreinstellung/Challenges + „zuletzt online“ + Status + Gruppen-Schlüssel (räumt Freigabe am Ende auf), Kontolöschung, Offline-Sync, Fortschrittsbilder
 - ✅ GitHub Actions: CI (Typecheck + Unit-Tests), Deploy PWA (GitHub Pages, Unterordner `/Gymolingo`), Deploy Backend (Supabase, nur wenn konfiguriert)
 
@@ -129,6 +129,7 @@ Letzte Aktualisierung: 2026-09-30
 - `supabase test db` kann das pg_prove-Image nicht laden → `scripts/test-db.sh` führt dieselben pgTAP-Dateien via psql aus.
 
 ## Entscheidungen
+- Gemini-Überlastung (Nutzer-Bug „KI-Dienst nicht erreichbar“ beim Foto-Tracking, 30.09.): Google antwortet seit Mitte 09/2026 häufig mit 503 „high demand“ für Flash-Modelle. Jetzt: 503/5xx → 2 Wiederholungen (1 s / 2,5 s), danach nächstes Modell (Foto: Flash → Flash-Lite → `gemini-3.5-flash-lite` → `gemini-3.8-flash`; Text: Flash-Lite → Flash → dieselben Ersatzmodelle, nur bei Überlastung, bei Kontingent-Ende sofortige Sperre wie gewünscht, `quotaFallback: false`); 404/Timeout → nächstes Modell; klare Meldungen (überlastet / zu lange / offline); unbeantwortete Anfragen zählen nicht gegen das 25er-Tageslimit.
 - Gemini-Schlüssel: Google gibt seit 2026 „AQ.“-Auth-Keys aus, alte „AIza“-Keys werden seit 09/2026 abgelehnt → Format-Prüfung akzeptiert beide (`looksLikeGeminiKey`), eingefügter Text wird bereinigt, Google-Fehlertext wird verständlich angezeigt; Prüfung per `models?pageSize=1`.
 - **0 € Betrieb** (Nutzerwunsch): KI standardmäßig aus, alles läuft lokal; Supabase optional im Free-Plan. Siehe `docs/KOSTENLOS_BETREIBEN.md`.
 - **KI = Google Gemini, kostenlos per „Bring your own key“** (Nutzerwunsch: 4 Personen, 100–120 Anfragen/Tag, 0 €). Grund: Google verlangt für Apps, die anderen EWR-Nutzern bereitgestellt werden, ein Abrechnungskonto; mit eigenem Schlüssel nutzt jede Person die Gratis-Stufe selbst. Kein Zahlungsmittel hinterlegt → keine Kosten möglich.
@@ -149,7 +150,7 @@ Letzte Aktualisierung: 2026-09-30
 - Demo-Daten (`generateDemoData`, 12 Wochen, deterministisch) für visuelle QA: `EXPO_PUBLIC_DEV_TOOLS=true` oder `npm run db:seed-demo`.
 
 ## Letzter erfolgreich getesteter Stand
-- Stand „Aktivitäten-Katalog": core 143/143, DB 83/83, Edge 38/38, E2E lokal 18/18, E2E Backend 6/6, Typecheck grün.
+- Stand „KI-Überlastung (503) abgefangen": core 151/151, DB 83/83, Edge 38/38, E2E lokal 19/19, E2E Backend 6/6, Typecheck grün.
 
 ## Nächste konkrete Aufgabe
 1. **Supabase live eingerichtet** (Deploy-Check 29.09.: alle Tabellen/Funktionen vorhanden, E-Mail-Bestätigung aus). Updates „Status“ und „Einladungen“ vom Nutzer eingespielt (30.09.). Offen: `supabase/updates/2026-09-30-activities.sql` (Deploy-Check „Aktivitäten-Katalog“). Nächstes: Live-Test mit echten Konten (Registrierung, Sync, Freunde, zuletzt online, Gruppen-KI-Schlüssel) – Rückmeldungen des Nutzers abarbeiten.

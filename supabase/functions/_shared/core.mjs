@@ -3281,6 +3281,7 @@ function generateDemoData(opts) {
 var GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 var GEMINI_TEXT_MODEL = "gemini-flash-lite-latest";
 var GEMINI_VISION_MODEL = "gemini-flash-latest";
+var GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
 var GeminiError = class extends Error {
   constructor(message, status, code, retryAfterSec = 60, daily = false) {
     super(message);
@@ -3341,7 +3342,8 @@ async function geminiGenerate(key, p, cfg = {}) {
       p.timeoutMs ?? 45e3
     );
   } catch (e) {
-    throw new GeminiError(`KI-Dienst nicht erreichbar (${e instanceof Error ? e.name : "Netzwerk"}).`, 502, "unavailable");
+    if (e instanceof Error && e.name === "AbortError") throw new GeminiError("Die Google-KI hat zu lange gebraucht \u2013 bitte erneut versuchen.", 504, "timeout");
+    throw new GeminiError(`Keine Verbindung zur Google-KI \u2013 bist du online? (${e instanceof Error ? e.message || e.name : "Netzwerk"})`, 502, "unavailable");
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -3358,7 +3360,9 @@ async function geminiGenerate(key, p, cfg = {}) {
     }
     if (res.status === 401 || res.status === 403 || /API key/i.test(msg)) throw new GeminiError("Der Gemini-Schl\xFCssel ist ung\xFCltig.", 503, "bad_key");
     if (res.status === 400) throw new GeminiError(`Ung\xFCltige KI-Anfrage: ${msg}`, 400, "bad_request");
-    throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}).`, 502, "unavailable");
+    if (res.status === 404) throw new GeminiError(`KI-Modell ${p.model} ist bei Google nicht verf\xFCgbar.`, 502, "not_found");
+    if (res.status >= 500) throw new GeminiError(`Die Google-KI ist gerade \xFCberlastet (hohe Nachfrage) \u2013 bitte in ein paar Minuten erneut versuchen. (${res.status})`, 503, "overloaded");
+    throw new GeminiError(`KI-Dienst nicht erreichbar (${res.status}: ${msg}).`, 502, "unavailable");
   }
   const used = body.modelVersion ?? p.model;
   if (body.promptFeedback?.blockReason) return { text: null, model: used, blocked: true };
@@ -3389,16 +3393,31 @@ async function geminiCheckKey(key, cfg = {}) {
 async function geminiValidateKey(key, cfg = {}) {
   return (await geminiCheckKey(key, cfg)).result;
 }
-async function geminiGuarded(key, models, p, store, cfg = {}) {
+async function geminiGuarded(key, models, p, store, cfg = {}, opts = {}) {
+  const delays = cfg.retryDelaysMs ?? [1e3, 2500];
   let last = null;
   for (const model of [...new Set(models)]) {
-    if (await store.isBlocked(model)) continue;
-    try {
-      return await geminiGenerate(key, { ...p, model }, cfg);
-    } catch (e) {
-      if (!(e instanceof GeminiError) || e.code !== "rate_limited") throw e;
-      last = e;
-      await store.block(model, e.retryAfterSec, e.daily ? "daily quota" : "rate limit");
+    if (await store.isBlocked(model)) {
+      if (opts.quotaFallback === false) break;
+      continue;
+    }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await geminiGenerate(key, { ...p, model }, cfg);
+      } catch (e) {
+        if (!(e instanceof GeminiError)) throw e;
+        if (e.code === "rate_limited") {
+          await store.block(model, e.retryAfterSec, e.daily ? "daily quota" : "rate limit");
+          if (opts.quotaFallback === false) throw e;
+        } else if (e.code === "overloaded" && attempt < delays.length) {
+          await new Promise((r) => setTimeout(r, delays[attempt]));
+          continue;
+        } else if (e.code !== "overloaded" && e.code !== "timeout" && e.code !== "not_found") {
+          throw e;
+        }
+        if (!last || last.code === "rate_limited") last = e;
+        break;
+      }
     }
   }
   throw last ?? new GeminiError("Das kostenlose KI-Kontingent ist aufgebraucht \u2013 die KI ist vor\xFCbergehend gesperrt.", 429, "rate_limited", 60, true);
@@ -3521,12 +3540,12 @@ function bodyFatFacts(profile, latest, year = (/* @__PURE__ */ new Date()).getFu
   ].filter(Boolean);
   return facts.length ? `Angaben: ${facts.join(", ")}.` : "Keine weiteren Angaben.";
 }
-var textModels = (cfg) => [cfg?.textModel ?? GEMINI_TEXT_MODEL];
-var photoModels = (cfg) => [cfg?.visionModel ?? GEMINI_VISION_MODEL, cfg?.textModel ?? GEMINI_TEXT_MODEL];
+var textModels = (cfg) => [cfg?.textModel ?? GEMINI_TEXT_MODEL, cfg?.visionModel ?? GEMINI_VISION_MODEL, ...cfg?.fallbackModels ?? GEMINI_FALLBACK_MODELS];
+var photoModels = (cfg) => [cfg?.visionModel ?? GEMINI_VISION_MODEL, cfg?.textModel ?? GEMINI_TEXT_MODEL, ...cfg?.fallbackModels ?? GEMINI_FALLBACK_MODELS];
 async function aiCoachReply(r, ctx, question, history) {
   const turns = history.filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim()).slice(-10).map((m) => ({ role: m.role === "user" ? "user" : "model", parts: [{ text: m.content.slice(0, 4e3) }] }));
   while (turns.length && turns[0].role !== "user") turns.shift();
-  const res = await geminiGuarded(r.key, textModels(r.cfg), { system: COACH_SYSTEM_PROMPT, contents: [...turns, { role: "user", parts: [{ text: buildCoachUserMessage(ctx, question.slice(0, 2e3)) }] }], temperature: 0.5 }, r.store, r.cfg);
+  const res = await geminiGuarded(r.key, textModels(r.cfg), { system: COACH_SYSTEM_PROMPT, contents: [...turns, { role: "user", parts: [{ text: buildCoachUserMessage(ctx, question.slice(0, 2e3)) }] }], temperature: 0.5 }, r.store, r.cfg, { quotaFallback: false });
   return res.blocked || !res.text ? null : { text: res.text, model: res.model };
 }
 async function aiWeeklyReportSections(r, stats, displayName, goal) {
@@ -3547,7 +3566,8 @@ Nutzer: ${displayName || "Athlet"}, Ziel: ${goal}.` }] }],
       maxOutputTokens: 8192
     },
     r.store,
-    r.cfg
+    r.cfg,
+    { quotaFallback: false }
   );
   if (res.blocked || !res.text) return null;
   const parsed = JSON.parse(res.text);
@@ -3665,6 +3685,7 @@ export {
   FOODS,
   FOOD_MAP,
   GEMINI_API_BASE,
+  GEMINI_FALLBACK_MODELS,
   GEMINI_TEXT_MODEL,
   GEMINI_VISION_MODEL,
   GeminiError,

@@ -5,7 +5,7 @@
  */
 import type { AthleteProfile } from '../types';
 import { buildCoachUserMessage, COACH_SYSTEM_PROMPT, WEEKLY_REPORT_PROMPT, type CoachContext } from '../coach/context';
-import { GEMINI_TEXT_MODEL, GEMINI_VISION_MODEL, geminiGuarded, type GeminiBlockStore, type GeminiConfig, type GeminiPart, type GeminiTurn } from './gemini';
+import { GEMINI_FALLBACK_MODELS, GEMINI_TEXT_MODEL, GEMINI_VISION_MODEL, geminiGuarded, type GeminiBlockStore, type GeminiConfig, type GeminiPart, type GeminiTurn } from './gemini';
 
 export const REPORT_SCHEMA = {
   type: 'object',
@@ -155,8 +155,9 @@ export function bodyFatFacts(profile: Pick<AthleteProfile, 'sex' | 'birth_year' 
 
 // ---------------------------------------------------------------- task runners (throw GeminiError; callers fall back to rules)
 type Run = { key: string; store: GeminiBlockStore; cfg?: GeminiConfig };
-const textModels = (cfg?: GeminiConfig) => [cfg?.textModel ?? GEMINI_TEXT_MODEL];
-const photoModels = (cfg?: GeminiConfig) => [cfg?.visionModel ?? GEMINI_VISION_MODEL, cfg?.textModel ?? GEMINI_TEXT_MODEL];
+/** Flash-Lite first (largest free quota); Flash only when Lite is overloaded or blocked */
+const textModels = (cfg?: GeminiConfig) => [cfg?.textModel ?? GEMINI_TEXT_MODEL, cfg?.visionModel ?? GEMINI_VISION_MODEL, ...(cfg?.fallbackModels ?? GEMINI_FALLBACK_MODELS)];
+const photoModels = (cfg?: GeminiConfig) => [cfg?.visionModel ?? GEMINI_VISION_MODEL, cfg?.textModel ?? GEMINI_TEXT_MODEL, ...(cfg?.fallbackModels ?? GEMINI_FALLBACK_MODELS)];
 
 /** Coach answer; null when the safety system declined (→ rule-based answer). */
 export async function aiCoachReply(r: Run, ctx: CoachContext, question: string, history: { role: string; content: string }[]): Promise<{ text: string; model: string } | null> {
@@ -165,7 +166,7 @@ export async function aiCoachReply(r: Run, ctx: CoachContext, question: string, 
     .slice(-10)
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content.slice(0, 4000) }] }));
   while (turns.length && turns[0].role !== 'user') turns.shift();
-  const res = await geminiGuarded(r.key, textModels(r.cfg), { system: COACH_SYSTEM_PROMPT, contents: [...turns, { role: 'user', parts: [{ text: buildCoachUserMessage(ctx, question.slice(0, 2000)) }] }], temperature: 0.5 }, r.store, r.cfg);
+  const res = await geminiGuarded(r.key, textModels(r.cfg), { system: COACH_SYSTEM_PROMPT, contents: [...turns, { role: 'user', parts: [{ text: buildCoachUserMessage(ctx, question.slice(0, 2000)) }] }], temperature: 0.5 }, r.store, r.cfg, { quotaFallback: false });
   return res.blocked || !res.text ? null : { text: res.text, model: res.model };
 }
 
@@ -183,6 +184,7 @@ export async function aiWeeklyReportSections(r: Run, stats: unknown, displayName
     },
     r.store,
     r.cfg,
+    { quotaFallback: false },
   );
   if (res.blocked || !res.text) return null;
   const parsed = JSON.parse(res.text) as { sections?: { heading: string; body: string }[] };

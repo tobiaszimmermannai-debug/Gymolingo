@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GeminiError, geminiGenerate, geminiGuarded, rateLimitInfo, type GeminiBlockStore } from '../src/ai/gemini';
-import { aiBodyFat, sanitizeBodyFat, sanitizeMealItems } from '../src/ai/tasks';
+import { aiBodyFat, aiMealPhoto, sanitizeBodyFat, sanitizeMealItems } from '../src/ai/tasks';
 
 type Call = { url: string; key: string; body: Record<string, any> };
 function mockFetch(respond: (c: Call) => { status: number; json: unknown }) {
@@ -64,6 +64,82 @@ describe('gemini client', () => {
     const store = memoryStore();
     await expect(geminiGuarded('k', ['m'], { system: 's', contents: [] }, store, { fetchImpl: f })).rejects.toMatchObject({ code: 'rate_limited', daily: false });
     expect(store.blocks['m']).toBe(7);
+  });
+});
+
+describe('gemini overload (503 "high demand")', () => {
+  const busy = { status: 503, json: { error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } } };
+  const cfg = (f: typeof fetch) => ({ fetchImpl: f, retryDelaysMs: [0, 0] });
+  const model = (c: Call) => c.url.split('/models/')[1].split(':')[0];
+
+  it('retries the same model when Google is briefly overloaded', async () => {
+    let n = 0;
+    const { f, calls } = mockFetch(() => (++n < 3 ? busy : ok('x')));
+    const r = await geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(f));
+    expect(r.text).toBe('x');
+    expect(calls.map(model)).toEqual(['a', 'a', 'a']);
+  });
+
+  it('falls back to the next model when one stays overloaded, without blocking it', async () => {
+    const { f, calls } = mockFetch((c) => (model(c) === 'a' ? busy : ok('y')));
+    const store = memoryStore();
+    const r = await geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, store, cfg(f));
+    expect(r.text).toBe('y');
+    expect(calls.map(model)).toEqual(['a', 'a', 'a', 'b']);
+    expect(store.blocks).toEqual({});
+  });
+
+  it('all overloaded → clear German message instead of "nicht erreichbar"', async () => {
+    const { f } = mockFetch(() => busy);
+    await expect(geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(f))).rejects.toMatchObject({ code: 'overloaded', message: expect.stringContaining('überlastet') });
+  });
+
+  it('overloaded beats the quota note of the fallback model', async () => {
+    const { f } = mockFetch((c) => (model(c) === 'a' ? busy : quota(false)));
+    await expect(geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(f))).rejects.toMatchObject({ code: 'overloaded' });
+  });
+
+  it('unknown model alias (404) and timeouts move on to the next model', async () => {
+    const { f, calls } = mockFetch((c) => (model(c) === 'a' ? { status: 404, json: { error: { message: 'not found' } } } : ok('z')));
+    expect((await geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(f))).text).toBe('z');
+    expect(calls.map(model)).toEqual(['a', 'b']);
+
+    let first = true;
+    const slow = (async (url: string) => {
+      if (first) {
+        first = false;
+        throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+      }
+      return new Response(JSON.stringify(ok('t').json), { status: 200 });
+    }) as unknown as typeof fetch;
+    expect((await geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(slow))).text).toBe('t');
+  });
+
+  it('quotaFallback=false: a used-up quota blocks right away, the second model is not asked', async () => {
+    const { f, calls } = mockFetch(() => quota(true));
+    const store = memoryStore();
+    await expect(geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, store, cfg(f), { quotaFallback: false })).rejects.toMatchObject({ code: 'rate_limited', daily: true });
+    expect(calls.map(model)).toEqual(['a']);
+    // afterwards the paused model is not bypassed via the second one
+    await expect(geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, store, cfg(f), { quotaFallback: false })).rejects.toMatchObject({ code: 'rate_limited' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('tasks: photos try Flash, Flash-Lite and the pinned fallback models in turn', async () => {
+    const { f, calls } = mockFetch((c) => (model(c).startsWith('gemini-3.8') ? { status: 200, json: { candidates: [{ content: { parts: [{ text: '{"items":[],"note":"ok"}' }] }, finishReason: 'STOP' }] } } : c.url.includes('3.5') ? { status: 404, json: {} } : busy));
+    const r = await aiMealPhoto({ key: 'k', store: memoryStore(), cfg: { fetchImpl: f, retryDelaysMs: [0, 0] } }, { data: 'x', mediaType: 'image/jpeg' });
+    expect(r?.note).toBe('ok');
+    expect([...new Set(calls.map(model))]).toEqual(['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+  });
+
+  it('offline (network error) is reported as such and not retried', async () => {
+    let n = 0;
+    const off = (async () => {
+      n++;
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    await expect(geminiGuarded('k', ['a', 'b'], { system: 's', contents: [] }, memoryStore(), cfg(off))).rejects.toMatchObject({ code: 'unavailable', message: expect.stringContaining('online') });
+    expect(n).toBe(1);
   });
 });
 

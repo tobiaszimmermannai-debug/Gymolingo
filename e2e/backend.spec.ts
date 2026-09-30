@@ -174,6 +174,8 @@ test('friends: request, accept, leaderboard and privacy settings are enforced', 
   await b.goto('/community');
   await b.getByTestId('community-tab-challenges').click();
   await b.getByTestId('join-Trainings-Duell').click();
+  // the card opens only once the list has reloaded with the joined state
+  await expect(b.getByTestId('join-Trainings-Duell')).toHaveCount(0);
   await b.getByTestId('challenge-Trainings-Duell').click();
   await expect(b.getByTestId('challenge-detail')).toContainText('Ada');
 });

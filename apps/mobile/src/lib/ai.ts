@@ -85,6 +85,12 @@ export function activeGeminiKey(): string | null {
   return p.geminiKey || p.sharedAi?.key || null;
 }
 
+/** Gives a request back when Google did not answer (overloaded, timeout, offline). */
+function refundLocal() {
+  const used = aiUsageToday();
+  if (used > 0) setPrefs({ aiUsage: { day: todayISO(), count: used - 1 } });
+}
+
 function deviceRun() {
   const key = activeGeminiKey();
   if (!key) return null;
@@ -97,7 +103,12 @@ function toAiError(e: unknown): AiError {
   if (e instanceof GeminiError) {
     if (e.code === 'rate_limited') return new AiError(e.message, 'rate_limited');
     if (e.code === 'bad_key') return new AiError('Der Gemini-Schlüssel ist ungültig – bitte in Einstellungen → KI neu eintragen.', 'no_key');
-    return new AiError(e.message, e.code === 'unavailable' ? 'unavailable' : 'failed');
+    // GeminiErrors only come from on-device runs: an unanswered request does not count
+    if (['unavailable', 'overloaded', 'timeout', 'not_found'].includes(e.code)) {
+      refundLocal();
+      return new AiError(e.message, 'unavailable');
+    }
+    return new AiError(e.message, 'failed');
   }
   if (e instanceof SyntaxError) return new AiError('Die KI-Antwort war unvollständig – bitte erneut versuchen.', 'failed');
   return new AiError(e instanceof Error ? e.message : String(e), 'failed');

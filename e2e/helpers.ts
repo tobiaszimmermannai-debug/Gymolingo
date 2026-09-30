@@ -37,7 +37,8 @@ export function jpegSize(buf: Buffer): { width: number; height: number } {
   throw new Error('no SOF marker');
 }
 
-type Mode = 'ok' | 'daily429';
+/** flash503 / all503: Google's "high demand" overload for Flash only / for every model */
+type Mode = 'ok' | 'daily429' | 'flash503' | 'all503';
 /** Simulates the Gemini REST API (key validation + generateContent) for a page. */
 export async function mockGemini(page: Page) {
   const state = { mode: 'ok' as Mode, calls: [] as { url: string; key: string | undefined; body: any }[] };
@@ -54,9 +55,12 @@ export async function mockGemini(page: Page) {
     state.calls.push({ url: req.url(), key, body });
     if (state.mode === 'daily429')
       return route.fulfill({ status: 429, headers: cors, json: { error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }] } } });
+    if (state.mode === 'all503' || (state.mode === 'flash503' && req.url().includes('/gemini-flash-latest:')))
+      return route.fulfill({ status: 503, headers: cors, json: { error: { code: 503, status: 'UNAVAILABLE', message: 'This model is currently experiencing high demand. Please try again later.' } } });
     const props = body.generationConfig?.responseJsonSchema?.properties ?? {};
     let text = 'KI-Antwort: Heute steht Oberkörper A an.';
     if (props.body_fat_pct) text = JSON.stringify({ usable: true, body_fat_pct: 17.2, range_low: 15, range_high: 19.5, confidence: 'medium', cues: 'Leichte Bauchdefinition sichtbar.', photo_tips: 'Gleiches Licht und Abstand.' });
+    if (props.items) text = JSON.stringify({ items: [{ name: 'Spaghetti Bolognese', grams: 350, kcal: 520, protein_g: 24, carbs_g: 68, fat_g: 16, confidence: 'medium' }], note: 'Portion geschätzt.' });
     if (props.sections) text = JSON.stringify({ sections: Array.from({ length: 7 }, (_, i) => ({ heading: `${i + 1}. KI-Abschnitt`, body: 'Text' })) });
     await route.fulfill({ status: 200, headers: cors, json: { candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }], modelVersion: 'mock' } });
   });
